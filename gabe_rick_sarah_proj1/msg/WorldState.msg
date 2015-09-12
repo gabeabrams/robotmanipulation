@@ -1,1 +1,2 @@
 Grid grid
+bool gripperOpen

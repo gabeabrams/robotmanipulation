@@ -32,7 +32,7 @@ def requestWorldState():
 
 ######################INIT FUNCTIONS########################
 def initNetwork():
-	"Initializes controller node networks
+	"Initializes controller node networks"
 	# Subscribe to world state publisher
 	rospy.Subscriber("world_state_connection", WorldState, worldStateReceived)
 	

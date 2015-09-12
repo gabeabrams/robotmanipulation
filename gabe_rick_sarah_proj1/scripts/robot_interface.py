@@ -16,6 +16,10 @@ def getWorldState():
 	"Get the world state object"
 	return worldState
 	
+def updateGripperState(isOpen):
+	"Change the gripper state in worldState"
+	worldState.gripperOpen = isOpen
+	
 def initWorldState(rows,cols):
 	"Initialize the world state with an empty grid"
 	worldState.grid = Grid()
@@ -24,6 +28,8 @@ def initWorldState(rows,cols):
 	worldState.grid.dimensions = Coord()
 	worldState.grid.dimensions.row = rows
 	worldState.grid.dimensions.col = cols
+	
+	worldState.gripperOpen = True
 	
 	return worldState
 
@@ -46,7 +52,7 @@ def initBlocksInStack(ascending,numBlocks,row,col):
 		newStack.blocks.reverse()
 		
 	# Add stack to blocks
-	worldState.stacks.append(newStack)
+	worldState.grid.stacks.append(newStack)
 	
 	return newStack
 	
@@ -54,7 +60,7 @@ def addBlockToWS(blockID, row, col):
 	"Add a block to world state on top of stack"
 	added = False
 	for stack in worldState.grid.stacks:
-		if stack.row == row && stack.col == col:
+		if stack.row == row and stack.col == col:
 			# Found an existing stack!
 			stack.blocks.append(blockID)
 			added = True
@@ -100,6 +106,7 @@ def getBlockInfo(blockID):
 # Network listeners
 def moveRobotRequested(req):
 	"Handles requested move from controller. Returns True only if the move is valid. Executes action"
+	
 	# Read in values from request
 	action = req.action
 	target = req.target
@@ -109,22 +116,24 @@ def moveRobotRequested(req):
 	row = target.loc.row
 	col = target.loc.col
 	
-	# Handle movement cases:
-	if isblock && blockID > 0:
+	# Prepare 
+	
+	# Calculate final location
+	if isblock and blockID > 0:
 		# Target is a block
 		break # TODO
 	
-	elif blockID = 0:
+	elif isblock and blockID == 0:
 		# Random location on the table
 		break # TODO
 	
 	else:
 		# Row and column specified
-		# TODO
+		return True # TODO
 	
-	# ––––––– TODO: MAKE BAXTER DO THINGS
+	# TODO: CHANGE WORLD STATE + BAXTER (later)
 	
-	bool succeeded = True # TODO
+	succeeded = True # TODO
 		
 	# Handle action cases
 	if action.type == action.OPEN_GRIPPER:
@@ -165,13 +174,14 @@ def initNetwork():
 	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
 
 # Full setup
-def initRobotInterface():
+def initRobotInterface(ascending,numBlocks,row,col):
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
 	
 	# Initialize world state
-	initWorldState(3,3) # TODO
+	initWorldState(10,10) # TODO
+	initBlocksInStack(True,3,4,4) # TODO: use params, don't hardcode
 	
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
