@@ -49,7 +49,6 @@ def initController():
 
 if __name__ == '__main__':
 	initController()
-	print "Doing something I swear"
 
 ######################OLD FUNCTIONS########################
 

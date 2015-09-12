@@ -7,7 +7,7 @@ from gabe_ricky_sarah_proj1.msg import*
 #########################GLOBAL DATA###########################
 
 #World State
-worldState = WorldState()
+worldState = WorldState() # TODO: add position of end effector
 # State: [bottom, ..., top]
 
 #######################WORLD STATE FUNCTIONS########################
@@ -104,10 +104,10 @@ def moveRobotRequested(req):
 	action = req.action
 	target = req.target
 	
-	isblock = action.isblock
-	blockID = action.block
-	row = action.loc.row
-	col = action.loc.col
+	isblock = target.isblock
+	blockID = target.block
+	row = target.loc.row
+	col = target.loc.col
 	
 	# Handle movement cases:
 	if isblock && blockID > 0:
@@ -165,7 +165,7 @@ def initNetwork():
 	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
 
 # Full setup
-def initializeRobotInterface():
+def initRobotInterface():
 "First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
@@ -184,7 +184,7 @@ def initializeRobotInterface():
 
 # INITIALIZE VIA MAIN
 if __name__ == "__main__":
-	robot_interface()	
+	initRobotInterface()	
 
 ######################OLD CODE########################
 
