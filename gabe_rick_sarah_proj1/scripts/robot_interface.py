@@ -13,11 +13,11 @@ worldState = WorldState() # TODO: add position of end effector
 #######################WORLD STATE FUNCTIONS########################
 
 def getWorldState():
-"Get the world state object"
+	"Get the world state object"
 	return worldState
 	
 def initWorldState(rows,cols):
-"Initialize the world state with an empty grid"
+	"Initialize the world state with an empty grid"
 	worldState.grid = Grid()
 	worldState.grid.stacks = []
 	
@@ -28,7 +28,7 @@ def initWorldState(rows,cols):
 	return worldState
 
 def initBlocksInStack(ascending,numBlocks,row,col):
-"Put a stack of numBlocks blocks in row,col"
+	"Put a stack of numBlocks blocks in row,col"
 	# Ascending    Descending
 	#   [3]           [1]
 	#   [2]           [2]
@@ -51,7 +51,7 @@ def initBlocksInStack(ascending,numBlocks,row,col):
 	return newStack
 	
 def addBlockToWS(blockID, row, col):
-"Add a block to world state on top of stack"
+	"Add a block to world state on top of stack"
 	added = False
 	for stack in worldState.grid.stacks:
 		if stack.row == row && stack.col == col:
@@ -68,19 +68,19 @@ def addBlockToWS(blockID, row, col):
 	return worldState
 
 def removeBlockFromWS(blockID):
-"Remove block from world state"
+	"Remove block from world state"
 	for stack in worldState.grid.stacks:
 		stack.remove(blockID)
 	return worldState
 
 def moveBlockInWS(blockID, row, col):
-"Updates worldState with blockID moved from its current location to (row,col). Does not send commands to baxter"
+	"Updates worldState with blockID moved from its current location to (row,col). Does not send commands to baxter"
 	removeBlockFromWS(blockID)
 	addBlockToWS(blockID,row,col)
 	return worldState
 
 def getBlockInfo(blockID):
-"Returns block info including depth: 1=top, len=bottom"
+	"Returns block info including depth: 1=top, len=bottom"
 	found = False
 	row = 0
 	col = 0
@@ -99,7 +99,7 @@ def getBlockInfo(blockID):
 
 # Network listeners
 def moveRobotRequested(req):
-"Handles requested move from controller. Returns True only if the move is valid. Executes action"
+	"Handles requested move from controller. Returns True only if the move is valid. Executes action"
 	# Read in values from request
 	action = req.action
 	target = req.target
@@ -145,7 +145,7 @@ def moveRobotRequested(req):
 		
 
 def getStateRequested(req):
-"Returns world state upon request"
+	"Returns world state upon request"
 	requestString = req.request
 	return worldState
 	
@@ -153,7 +153,7 @@ def getStateRequested(req):
 
 #Setup network
 def initNetwork():
-"Initializes networking functionality. Returns all server and publisher info"
+	"Initializes networking functionality. Returns all server and publisher info"
 	# Setup service responses:
 	moveRobotServer = rospy.Service('move_robot',MoveRobot,moveRobotRequested)
 	getStateServer = rospy.Service('get_state',WorldState_Request,getStateRequested)
@@ -166,7 +166,7 @@ def initNetwork():
 
 # Full setup
 def initRobotInterface():
-"First function to call. Initializes robot_interface node."
+	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
 	

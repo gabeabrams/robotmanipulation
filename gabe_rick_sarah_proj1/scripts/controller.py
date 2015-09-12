@@ -11,17 +11,17 @@ requestWorldState_Connection = None
 
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
-"Receives the world state from robot_interface"
+	"Receives the world state from robot_interface"
 	# TODO: record world state
 	return 1
 
 def commandReceived(data):
-"Handles custom commands from terminal"
+	"Handles custom commands from terminal"
 	# Receives commands from terminal
 	return 1
 	
 def requestWorldState():
-"Requests the world state from robot_interface"
+	"Requests the world state from robot_interface"
 	try:
 		if requestWorldState_Connection == None:
 			rospy.wait_for_service('get_state')
@@ -32,7 +32,7 @@ def requestWorldState():
 
 ######################INIT FUNCTIONS########################
 def initNetwork():
-"Initializes controller node networks
+	"Initializes controller node networks
 	# Subscribe to world state publisher
 	rospy.Subscriber("world_state_connection", WorldState, worldStateReceived)
 	
@@ -40,7 +40,7 @@ def initNetwork():
 	rospy.Subscriber("command", String, commandReceived)
 	
 def initController():
-"First function to initialize the controller node"
+	"First function to initialize the controller node"
 	# Create controller node
 	rospy.init_node("controller")
 	
