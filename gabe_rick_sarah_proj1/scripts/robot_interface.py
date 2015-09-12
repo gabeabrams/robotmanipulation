@@ -4,15 +4,199 @@ import rospy
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
 
+#########################GLOBAL DATA###########################
+
+#World State
+worldState = WorldState()
+# State: [bottom, ..., top]
+
+#######################WORLD STATE FUNCTIONS########################
+
+def getWorldState():
+"Get the world state object"
+	return worldState
+	
+def initWorldState(rows,cols):
+"Initialize the world state with an empty grid"
+	worldState.grid = Grid()
+	worldState.grid.stacks = []
+	
+	worldState.grid.dimensions = Coord()
+	worldState.grid.dimensions.row = rows
+	worldState.grid.dimensions.col = cols
+	
+	return worldState
+
+def initBlocksInStack(ascending,numBlocks,row,col):
+"Put a stack of numBlocks blocks in row,col"
+	# Ascending    Descending
+	#   [3]           [1]
+	#   [2]           [2]
+	#   [1]           [3]
+	#"""""""""""""""""""""""""
+
+	newStack = Stack()
+	newStack.row = row
+	newStack.col = col
+	
+	newStack.blocks = range(1,numBlocks+1)
+	
+	# Reverse the stack if descending
+	if not ascending:
+		newStack.blocks.reverse()
+		
+	# Add stack to blocks
+	worldState.stacks.append(newStack)
+	
+	return newStack
+	
+def addBlockToWS(blockID, row, col):
+"Add a block to world state on top of stack"
+	added = False
+	for stack in worldState.grid.stacks:
+		if stack.row == row && stack.col == col:
+			# Found an existing stack!
+			stack.blocks.append(blockID)
+			added = True
+	
+	if not added:
+		newStack = Stack()
+		newStack.row = row
+		newStack.col = col
+		newStack.blocks = [blockID]
+		worldState.grid.stacks.append(newStack)
+	return worldState
+
+def removeBlockFromWS(blockID):
+"Remove block from world state"
+	for stack in worldState.grid.stacks:
+		stack.remove(blockID)
+	return worldState
+
+def moveBlockInWS(blockID, row, col):
+"Updates worldState with blockID moved from its current location to (row,col). Does not send commands to baxter"
+	removeBlockFromWS(blockID)
+	addBlockToWS(blockID,row,col)
+	return worldState
+
+def getBlockInfo(blockID):
+"Returns block info including depth: 1=top, len=bottom"
+	found = False
+	row = 0
+	col = 0
+	depth = 0
+
+	for stack in worldState.grid.stacks:
+		if blockID in stack:
+			row = stack.row
+			col = stack.col
+			depth = len(stack) - stack.blocks.index(blockID)
+			found = True
+	
+	return (found,row,col,depth)
+	
+######################NETWORKING FUNCTIONS########################
+
+# Network listeners
+def moveRobotRequested(req):
+"Handles requested move from controller. Returns True only if the move is valid. Executes action"
+	# Read in values from request
+	action = req.action
+	target = req.target
+	
+	isblock = action.isblock
+	blockID = action.block
+	row = action.loc.row
+	col = action.loc.col
+	
+	# Handle movement cases:
+	if isblock && blockID > 0:
+		# Target is a block
+		break # TODO
+	
+	elif blockID = 0:
+		# Random location on the table
+		break # TODO
+	
+	else:
+		# Row and column specified
+		# TODO
+	
+	# ––––––– TODO: MAKE BAXTER DO THINGS
+	
+	bool succeeded = True # TODO
+		
+	# Handle action cases
+	if action.type == action.OPEN_GRIPPER:
+		succeeded = False
+	
+	if action.type == action.CLOSE_GRIPPER:
+		succeeded = False
+		
+	if action.type == action.MOVE_TO_BLOCK:
+		succeeded = False
+		
+	if action.type == action.MOVE_OVER_BLOCK:
+		succeeded = False
+	
+	
+	# Prepare response
+	return succeeded
+		
+
+def getStateRequested(req):
+"Returns world state upon request"
+	requestString = req.request
+	return worldState
+	
+######################INIT FUNCTIONS########################
+
+#Setup network
+def initNetwork():
+"Initializes networking functionality. Returns all server and publisher info"
+	# Setup service responses:
+	moveRobotServer = rospy.Service('move_robot',MoveRobot,moveRobotRequested)
+	getStateServer = rospy.Service('get_state',WorldState_Request,getStateRequested)
+	
+	# Publisher connection setup:
+	worldStatePublisher = rospy.Publisher('world_state_connection',WorldState,queue_size = 10)
+	publishRate = rospy.Rate(1) # Set publishing rate to 1Hz
+	
+	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
+
+# Full setup
+def initializeRobotInterface():
+"First function to call. Initializes robot_interface node."
+	# Create node
+	rospy.init_node('robot_interface')
+	
+	# Initialize world state
+	initWorldState(3,3) # TODO
+	
+	# Initialize network
+	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
+	
+	# Continually network
+	while not rospy.is_shutdown():
+		rospy.loginfo(worldState)
+		worldStatePublisher.publish(worldState)
+		publishRate.sleep()
+
+# INITIALIZE VIA MAIN
+if __name__ == "__main__":
+	robot_interface()	
+
+######################OLD CODE########################
+
 #Answers move_robot requests
 def move_robot(req):
-	print "Checking validity"
+	print "Checking validity" # TODO
 	return true
 
 #Answers get_state requests
 def get_state(req):
-	print "Retrieving state"
-	return state	
+	print "Retrieving state" # TODO
+	return "THIS SHOULD BE THE STATE"	
 
 #Maintains state and publishes
 def robot_interface():
@@ -49,6 +233,5 @@ def robot_interface():
 		pub.publish(msg)
 		rate.sleep()
 
-if __name__ == "__main__":
-	robot_interface()	
+
 	
