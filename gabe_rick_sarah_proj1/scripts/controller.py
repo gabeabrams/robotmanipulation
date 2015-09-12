@@ -27,7 +27,7 @@ def requestWorldState():
 			rospy.wait_for_service('get_state')
 			requestWorldState_Connection = rospy.ServiceProxy("get_state",WorldState_Request)
 		return requestWorldState_Connection() # TODO: NOTHING TO PASS. WHAT DO WE DO?
-	catch rospy.ServiceException, e:
+	except rospy.ServiceException, e:
 		return None
 
 ######################INIT FUNCTIONS########################
