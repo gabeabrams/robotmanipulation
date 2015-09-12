@@ -19,6 +19,9 @@ def getWorldState():
 def updateGripperState(isOpen):
 	"Change the gripper state in worldState"
 	worldState.gripperOpen = isOpen
+
+def getGripperState():
+	return worldState.gripperOpen
 	
 def initWorldState(rows,cols):
 	"Initialize the world state with an empty grid"
@@ -76,7 +79,8 @@ def addBlockToWS(blockID, row, col):
 def removeBlockFromWS(blockID):
 	"Remove block from world state"
 	for stack in worldState.grid.stacks:
-		stack.remove(blockID)
+		if blockID in stack.blocks:
+			stack.blocks.remove(blockID)
 	return worldState
 
 def moveBlockInWS(blockID, row, col):
@@ -93,13 +97,29 @@ def getBlockInfo(blockID):
 	depth = 0
 
 	for stack in worldState.grid.stacks:
-		if blockID in stack:
+		if blockID in stack.blocks:
 			row = stack.row
 			col = stack.col
-			depth = len(stack) - stack.blocks.index(blockID)
+			depth = len(stack.blocks) - stack.blocks.index(blockID)
 			found = True
 	
 	return (found,row,col,depth)
+
+def getStackInWS(row,col):
+	for stack in worldState.grid.stacks:
+		if stack.row == row and stack.col == col:
+			return stack
+	return None
+
+def getRandomTableLocation(blockID):
+	"Returns row and column of random open table location"
+	succeeded = False
+	row = 0
+	col = 0
+	
+	while not succeeded:
+		row = randrange(worldState.grid.dimensions.rows)
+		col = randrange(worldState.grid.dimensions.cols)
 	
 ######################NETWORKING FUNCTIONS########################
 
@@ -116,16 +136,15 @@ def moveRobotRequested(req):
 	row = target.loc.row
 	col = target.loc.col
 	
-	# Prepare 
 	
 	# Calculate final location
 	if isblock and blockID > 0:
 		# Target is a block
-		break # TODO
+		return True # TODO
 	
 	elif isblock and blockID == 0:
 		# Random location on the table
-		break # TODO
+		return True # TODO
 	
 	else:
 		# Row and column specified
@@ -158,6 +177,57 @@ def getStateRequested(req):
 	requestString = req.request
 	return worldState
 	
+######################TESTING FUNCTIONS########################
+def runTests():
+	# Assuming initialized with: initBlocksInStack(True,3,0,0)
+	updateGripperState(False)
+	assert(getGripperState()==False)
+	
+	stack = getStackInWS(0,0)
+	assert(stack.blocks[0] == 1)
+	assert(stack.blocks[1] == 2)
+	assert(stack.blocks[2] == 3)
+	
+	stack = getStackInWS(5,5)
+	assert(stack == None)
+	
+	(found,row,col,depth) = getBlockInfo(1)
+	assert(found==True)
+	assert(row==0)
+	assert(col==0)
+	assert(depth==3)
+	
+	(found,row,col,depth) = getBlockInfo(2)
+	assert(found==True)
+	assert(row==0)
+	assert(col==0)
+	assert(depth==2)
+	
+	(found,row,col,depth) = getBlockInfo(3)
+	assert(found==True)
+	assert(row==0)
+	assert(col==0)
+	assert(depth==1)
+	
+	removeBlockFromWS(3)
+	(found,row,col,depth) = getBlockInfo(3)
+	assert(found==False)
+	
+	addBlockToWS(3,1,1)
+	(found,row,col,depth) = getBlockInfo(3)
+	assert(found)
+	assert(row==1)
+	assert(col==1)
+	assert(depth==1)
+	
+	moveBlockInWS(3,2,2)
+	(found,row,col,depth) = getBlockInfo(3)
+	assert(found)
+	assert(row==2)
+	assert(col==2)
+	assert(depth==1)
+	
+	
 ######################INIT FUNCTIONS########################
 
 #Setup network
@@ -174,14 +244,16 @@ def initNetwork():
 	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
 
 # Full setup
-def initRobotInterface(ascending,numBlocks,row,col):
+def initRobotInterface():
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
 	
 	# Initialize world state
 	initWorldState(10,10) # TODO
-	initBlocksInStack(True,3,4,4) # TODO: use params, don't hardcode
+	initBlocksInStack(True,3,0,0) # TODO: use params, don't hardcode
+	
+	runTests() # TODO: remove
 	
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
@@ -195,6 +267,7 @@ def initRobotInterface(ascending,numBlocks,row,col):
 # INITIALIZE VIA MAIN
 if __name__ == "__main__":
 	initRobotInterface()	
+	
 
 ######################OLD CODE########################
 
