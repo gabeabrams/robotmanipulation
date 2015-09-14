@@ -243,15 +243,38 @@ def initNetwork():
 	
 	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
 
+def readParams():
+	# Reads ROS Parameters from launch file
+	global gridRows
+	global gridCols
+	global numBlocks
+	global blockLocaleRow
+	global blockLocaleCol
+	global isAscending
+	global goalState
+	global isOneArmSolution
+
+	gridRows = rospy.get_param("gridRows")
+	gridCols = rospy.get_param("gridCols")
+	numBlocks = rospy.get_param("numBlocks")
+	blockLocaleRow = rospy.get_param("blockLocaleRow")
+	blockLocaleCol = rospy.get_param("blockLocaleCol")
+	isAscending = rospy.get_param("isAscending")
+	goalState = rospy.get_param("goalState")
+	isOneArmSolution = rospy.get_param("isOneArmSolution")	
+
 # Full setup
 def initRobotInterface():
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
+
+	# Get parameters
+	readParams()
 	
 	# Initialize world state
-	initWorldState(10,10) # TODO
-	initBlocksInStack(True,3,0,0) # TODO: use params, don't hardcode
+	initWorldState(gridRows,gridCols) 
+	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
 	
 	runTests() # TODO: remove
 	

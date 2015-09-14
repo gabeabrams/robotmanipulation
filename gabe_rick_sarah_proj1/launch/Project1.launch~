@@ -1,6 +1,6 @@
 <launch>
 
-	<node name = "controller" pkg = "gabe_ricky_sarah_proj1" type = "scripts/controller" />
+	<node name = "controller" pkg = "gabe_ricky_sarah_proj1" type = "controller" />
 
 	<node name = "robot_interface" pkg = "gabe_ricky_sarah_proj1" type = "robot_interface" />
 

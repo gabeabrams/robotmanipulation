@@ -38,6 +38,26 @@ def initNetwork():
 	
 	# Subscribe to terminal commands
 	rospy.Subscriber("command", String, commandReceived)
+
+def readParams():
+	# Reads ROS Parameters from launch file
+	global gridRows
+	global gridCols
+	global numBlocks
+	global blockLocaleRow
+	global blockLocaleCol
+	global isAscending
+	global goalState
+	global isOneArmSolution
+	
+	gridRows = rospy.get_param("gridRows")
+	gridCols = rospy.get_param("gridCols")
+	numBlocks = rospy.get_param("numBlocks")
+	blockLocaleRow = rospy.get_param("blockLocaleRow")
+	blockLocaleCol = rospy.get_param("blockLocaleCol")
+	isAscending = rospy.get_param("isAscending")
+	goalState = rospy.get_param("goalState")
+	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 	
 def initController():
 	"First function to initialize the controller node"
@@ -46,6 +66,9 @@ def initController():
 	
 	# Create the network
 	initNetwork()
+
+	# Get parameters
+	readParams()
 
 if __name__ == '__main__':
 	initController()
