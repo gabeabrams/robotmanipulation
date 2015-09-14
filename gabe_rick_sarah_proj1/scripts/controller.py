@@ -22,9 +22,9 @@ def commandReceived(data):
 	
 def requestWorldState():
 	"Requests the world state from robot_interface"
+	rospy.wait_for_service('get_state')
 	try:
 		if requestWorldState_Connection == None:
-			rospy.wait_for_service('get_state')
 			requestWorldState_Connection = rospy.ServiceProxy("get_state",WorldState_Request)
 		return requestWorldState_Connection() # TODO: NOTHING TO PASS. WHAT DO WE DO?
 	except rospy.ServiceException, e:
@@ -59,7 +59,7 @@ def readParams():
 	goalState = rospy.get_param("goalState")
 	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 	
-def initController():
+def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSpolution):
 	"First function to initialize the controller node"
 	# Create controller node
 	rospy.init_node("controller")
@@ -67,13 +67,11 @@ def initController():
 	# Create the network
 	initNetwork()
 
-	# Get parameters
-	readParams()
-
 	rospy.spin()
 
 if __name__ == '__main__':
-	initController()
+	#readParams()
+	initController(5,5,3,3,3,True,"descending",True)
 
 ######################OLD FUNCTIONS########################
 

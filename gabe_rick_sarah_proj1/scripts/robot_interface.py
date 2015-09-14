@@ -25,6 +25,7 @@ def getGripperState():
 	
 def initWorldState(rows,cols):
 	"Initialize the world state with an empty grid"
+	global worldState
 	worldState.grid = Grid()
 	worldState.grid.stacks = []
 	
@@ -34,7 +35,6 @@ def initWorldState(rows,cols):
 	
 	worldState.gripperOpen = True
 	
-	return worldState
 
 def initBlocksInStack(ascending,numBlocks,row,col):
 	"Put a stack of numBlocks blocks in row,col"
@@ -48,7 +48,7 @@ def initBlocksInStack(ascending,numBlocks,row,col):
 	newStack.row = row
 	newStack.col = col
 	
-	newStack.blocks = [range(1,numBlocks+1)]
+	newStack.blocks = range(1,numBlocks+1)
 	
 	# Reverse the stack if descending
 	if not ascending:
@@ -264,19 +264,20 @@ def readParams():
 	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 
 # Full setup
-def initRobotInterface():
+def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSpolution):
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
 
 	# Get parameters
-	readParams()
+	#readParams()
 	
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
 	
-	#runTests() # TODO: remove
+	rospy.sleep(1)
+	runTests() # TODO: remove
 	
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
@@ -289,8 +290,11 @@ def initRobotInterface():
 
 # INITIALIZE VIA MAIN
 if __name__ == "__main__":
-	initRobotInterface()	
-	
+	try:
+		#readParams()
+		initRobotInterface(5,5,3,0,0,True,"descending",True)
+	except rospy.ROSInterruptException:
+		pass	
 
 ######################OLD CODE########################
 
