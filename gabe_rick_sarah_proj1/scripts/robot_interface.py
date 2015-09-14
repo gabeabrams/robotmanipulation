@@ -48,7 +48,7 @@ def initBlocksInStack(ascending,numBlocks,row,col):
 	newStack.row = row
 	newStack.col = col
 	
-	newStack.blocks = range(1,numBlocks+1)
+	newStack.blocks = [range(1,numBlocks+1)]
 	
 	# Reverse the stack if descending
 	if not ascending:
@@ -276,7 +276,7 @@ def initRobotInterface():
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
 	
-	runTests() # TODO: remove
+	#runTests() # TODO: remove
 	
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()

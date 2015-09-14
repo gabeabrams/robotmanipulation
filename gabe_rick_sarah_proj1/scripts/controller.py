@@ -13,7 +13,7 @@ requestWorldState_Connection = None
 def worldStateReceived(data):
 	"Receives the world state from robot_interface"
 	# TODO: record world state
-	return 1
+	print data
 
 def commandReceived(data):
 	"Handles custom commands from terminal"
@@ -69,6 +69,8 @@ def initController():
 
 	# Get parameters
 	readParams()
+
+	rospy.spin()
 
 if __name__ == '__main__':
 	initController()
