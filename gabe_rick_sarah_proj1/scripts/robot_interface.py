@@ -1,14 +1,20 @@
 #!/usr/bin/env python
 
 import rospy
+import random
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
 
 #########################GLOBAL DATA###########################
 
 #World State
-worldState = WorldState() # TODO: add position of end effector
-# State: [bottom, ..., top]
+worldState = WorldState()
+
+#Save the last action performed
+lastAction = 5; #1st action was action.MOVE_TO_BLOCK
+holding = None;
+lastHeld = None;
+lastTarget = 3;
 
 #######################WORLD STATE FUNCTIONS########################
 
@@ -18,9 +24,11 @@ def getWorldState():
 	
 def updateGripperState(isOpen):
 	"Change the gripper state in worldState"
+	global worldState
 	worldState.gripperOpen = isOpen
 
-def getGripperState():
+def getGripperIsOpen():
+	global worldState
 	return worldState.gripperOpen
 	
 def initWorldState(rows,cols):
@@ -49,10 +57,15 @@ def initBlocksInStack(ascending,numBlocks,row,col):
 	newStack.col = col
 	
 	newStack.blocks = range(1,numBlocks+1)
+
+	global lastTarget 
+	lastTarget = numBlocks
 	
 	# Reverse the stack if descending
 	if not ascending:
-		newStack.blocks.reverse()
+		newStack.blocks.reverse() 
+		lastTarget = 1
+		print lastTarget
 		
 	# Add stack to blocks
 	worldState.grid.stacks.append(newStack)
@@ -81,6 +94,11 @@ def removeBlockFromWS(blockID):
 	for stack in worldState.grid.stacks:
 		if blockID in stack.blocks:
 			stack.blocks.remove(blockID)
+
+	for stack in worldState.grid.stacks:
+		if stack.blocks == []:
+			worldState.grid.stacks.remove(stack)
+
 	return worldState
 
 def moveBlockInWS(blockID, row, col):
@@ -102,6 +120,11 @@ def getBlockInfo(blockID):
 			col = stack.col
 			depth = len(stack.blocks) - stack.blocks.index(blockID)
 			found = True
+
+	if blockID == 0:
+		(row,col) = getRandomTableLocation()
+		depth = 1
+		found = True	
 	
 	return (found,row,col,depth)
 
@@ -111,15 +134,22 @@ def getStackInWS(row,col):
 			return stack
 	return None
 
-def getRandomTableLocation(blockID):
+def getRandomTableLocation():
 	"Returns row and column of random open table location"
 	succeeded = False
+	taken = False
 	row = 0
 	col = 0
 	
 	while not succeeded:
-		row = randrange(worldState.grid.dimensions.rows)
-		col = randrange(worldState.grid.dimensions.cols)
+		row = random.randint(0, worldState.grid.dimensions.row)
+		col = random.randint(0, worldState.grid.dimensions.col)
+		for stack in worldState.grid.stacks:
+			if row == stack.row and col == stack.col:
+				taken = True
+		succeeded = not taken
+
+	return (row,col)	
 	
 ######################NETWORKING FUNCTIONS########################
 
@@ -136,52 +166,174 @@ def moveRobotRequested(req):
 	row = target.loc.row
 	col = target.loc.col
 	
+	gripperIsOpen = getGripperIsOpen()
+	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+	global lastAction	#Previous Command
+	global lastTarget	#Last Targetted blockID
+	global holding		#Block currently held
+	global lastHeld		#Last held block
+
+	#Assume action cannot be done
+	valid = False
 	
-	# Calculate final location
-	if isblock and blockID > 0:
+	if isblock:
 		# Target is a block
-		return True # TODO
+		if action.type == action.OPEN_GRIPPER:
+			valid = True
+			updateGripperState(True)
+			if holding != None:		# Prevents errors from unnecessary opening
+				lastHeld = holding 	# Update last held block
+			holding = None 			# No longer holding block
+
+		elif action.type == action.CLOSE_GRIPPER:
+			valid = True
+			updateGripperState(False)
+			if lastAction == action.OPEN_GRIPPER:
+				holding = lastHeld
+			if lastAction == action.MOVE_TO_BLOCK:
+				holding = lastTarget
+
+		elif action.type == action.MOVE_TO_BLOCK:
+			top = (blockDepth == 1)
+			gOpen = gripperIsOpen
+			valid = (top and gOpen)
+			if valid:
+				lastAction = action.MOVE_TO_BLOCK
+				lastTarget = blockID
+
+		elif action.type == action.MOVE_OVER_BLOCK:
+			top = (blockDepth == 1)
+			notSelf = (holding != blockID)
+			valid = (top and notSelf)		
+			if valid:
+				lastAction = action.MOVE_OVER_BLOCK
+				if (holding != None):
+					removeBlockFromWS(holding)
+					addBlockToWS(holding, blockRow, blockCol)	
 	
 	elif isblock and blockID == 0:
-		# Random location on the table
-		return True # TODO
+		if action.type == action.OPEN_GRIPPER:
+			valid = True
+			updateGripperState(True)
+			if holding != None:		# Prevents errors from unnecessary opening
+				lastHeld = holding 	# Update last held block
+			holding = None 			# No longer holding block
+
+		elif action.type == action.CLOSE_GRIPPER:
+			valid = True
+			updateGripperState(False)
+			if lastAction == action.OPEN_GRIPPER:
+				holding = lastHeld
+			if lastAction == action.MOVE_TO_BLOCK:
+				holding == lastTarget
+
+		elif action.type == action.MOVE_TO_BLOCK:
+			valid = False
+
+		elif action.type == action.MOVE_OVER_BLOCK:
+			valid = True
+			lastAction = action.MOVE_OVER_BLOCK
+			if (holding != None):
+				removeBlockFromWS(holding)
+				addBlockToWS(holding, blockRow, blockCol)			
 	
 	else:
 		# Row and column specified
-		return True # TODO
+		valid = True # TODO
 	
-	# TODO: CHANGE WORLD STATE + BAXTER (later)
-	
-	succeeded = True # TODO
+	#Respond
+	return valid # TODO	
 		
-	# Handle action cases
-	if action.type == action.OPEN_GRIPPER:
-		succeeded = False
-	
-	if action.type == action.CLOSE_GRIPPER:
-		succeeded = False
-		
-	if action.type == action.MOVE_TO_BLOCK:
-		succeeded = False
-		
-	if action.type == action.MOVE_OVER_BLOCK:
-		succeeded = False
-	
-	
-	# Prepare response
-	return succeeded
-		
-
 def getStateRequested(req):
 	"Returns world state upon request"
 	requestString = req.request
 	return worldState
+
+######################INIT FUNCTIONS########################
+
+#Setup network
+def initNetwork():
+	"Initializes networking functionality. Returns all server and publisher info"
+	# Setup service responses:
+	moveRobotServer = rospy.Service('move_robot',MoveRobot,moveRobotRequested)
+	getStateServer = rospy.Service('get_state',WorldState_Request,getStateRequested)
 	
+	# Publisher connection setup:
+	worldStatePublisher = rospy.Publisher('world_state_connection',WorldState,queue_size = 10)
+	publishRate = rospy.Rate(1) # Set publishing rate to 1Hz
+	
+	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
+
+def readParams():
+	# Reads ROS Parameters from launch file
+	global gridRows
+	global gridCols
+	global numBlocks
+	global blockLocaleRow
+	global blockLocaleCol
+	global isAscending
+	global goalState
+	global isOneArmSolution
+
+	gridRows = rospy.get_param("gridRows")
+	gridCols = rospy.get_param("gridCols")
+	numBlocks = rospy.get_param("numBlocks")
+	blockLocaleRow = rospy.get_param("blockLocaleRow")
+	blockLocaleCol = rospy.get_param("blockLocaleCol")
+	isAscending = rospy.get_param("isAscending")
+	goalState = rospy.get_param("goalState")
+	isOneArmSolution = rospy.get_param("isOneArmSolution")	
+
+# Full setup
+def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSolution):
+	"First function to call. Initializes robot_interface node."
+	# Create node
+	rospy.init_node('robot_interface')
+	
+	# Initialize world state
+	initWorldState(gridRows,gridCols) 
+	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
+	
+	#runTests() # TODO: remove
+
+	# Initialize network
+	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
+	
+	# Continually network
+	while not rospy.is_shutdown():
+		rospy.loginfo(worldState)
+		worldStatePublisher.publish(worldState)
+		publishRate.sleep()
+
+# INITIALIZE VIA MAIN
+if __name__ == "__main__":
+	try:
+		ParamsBeingRead = 0
+		readParams(); ParamsBeingRead = 1
+		if ParamsBeingRead == 0:
+			gridRows = 5
+			gridCols = 5
+			numBlocks = 3
+			blockLocaleRow = 0
+			blockLocaleCol = 0
+			isAscending = True
+			goalState = "descending"
+			isOneArmSolution = False
+		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,isAscending,goalState,isOneArmSolution)
+	except rospy.ROSInterruptException:
+		pass
+
 ######################TESTING FUNCTIONS########################
 def runTests():
+	global worldState
 	# Assuming initialized with: initBlocksInStack(True,3,0,0)
 	updateGripperState(False)
-	assert(getGripperState()==False)
+	assert(getGripperIsOpen()==False)
+	print worldState
+
+	updateGripperState(True)
+	assert(getGripperIsOpen()==True)
+	print worldState
 	
 	stack = getStackInWS(0,0)
 	assert(stack.blocks[0] == 1)
@@ -226,75 +378,6 @@ def runTests():
 	assert(row==2)
 	assert(col==2)
 	assert(depth==1)
-	
-	
-######################INIT FUNCTIONS########################
-
-#Setup network
-def initNetwork():
-	"Initializes networking functionality. Returns all server and publisher info"
-	# Setup service responses:
-	moveRobotServer = rospy.Service('move_robot',MoveRobot,moveRobotRequested)
-	getStateServer = rospy.Service('get_state',WorldState_Request,getStateRequested)
-	
-	# Publisher connection setup:
-	worldStatePublisher = rospy.Publisher('world_state_connection',WorldState,queue_size = 10)
-	publishRate = rospy.Rate(1) # Set publishing rate to 1Hz
-	
-	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
-
-def readParams():
-	# Reads ROS Parameters from launch file
-	global gridRows
-	global gridCols
-	global numBlocks
-	global blockLocaleRow
-	global blockLocaleCol
-	global isAscending
-	global goalState
-	global isOneArmSolution
-
-	gridRows = rospy.get_param("gridRows")
-	gridCols = rospy.get_param("gridCols")
-	numBlocks = rospy.get_param("numBlocks")
-	blockLocaleRow = rospy.get_param("blockLocaleRow")
-	blockLocaleCol = rospy.get_param("blockLocaleCol")
-	isAscending = rospy.get_param("isAscending")
-	goalState = rospy.get_param("goalState")
-	isOneArmSolution = rospy.get_param("isOneArmSolution")	
-
-# Full setup
-def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSpolution):
-	"First function to call. Initializes robot_interface node."
-	# Create node
-	rospy.init_node('robot_interface')
-
-	# Get parameters
-	#readParams()
-	
-	# Initialize world state
-	initWorldState(gridRows,gridCols) 
-	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
-	
-	rospy.sleep(1)
-	runTests() # TODO: remove
-	
-	# Initialize network
-	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
-	
-	# Continually network
-	while not rospy.is_shutdown():
-		rospy.loginfo(worldState)
-		worldStatePublisher.publish(worldState)
-		publishRate.sleep()
-
-# INITIALIZE VIA MAIN
-if __name__ == "__main__":
-	try:
-		#readParams()
-		initRobotInterface(5,5,3,0,0,True,"descending",True)
-	except rospy.ROSInterruptException:
-		pass	
 
 ######################OLD CODE########################
 

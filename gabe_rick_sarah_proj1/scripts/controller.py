@@ -8,25 +8,31 @@ from std_msgs.msg import String
 #########################GLOBAL DATA###########################
 
 requestWorldState_Connection = None
+worldState = WorldState()
 
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
 	"Receives the world state from robot_interface"
-	# TODO: record world state
-	print data
+	global worldState
+	worldState = data
 
 def commandReceived(data):
 	"Handles custom commands from terminal"
 	# Receives commands from terminal
 	return 1
-	
+
+def moveRobotRequest():
+	return 1
+
 def requestWorldState():
 	"Requests the world state from robot_interface"
 	rospy.wait_for_service('get_state')
+	global requestWorldState_Connection
+	global worldState
 	try:
 		if requestWorldState_Connection == None:
-			requestWorldState_Connection = rospy.ServiceProxy("get_state",WorldState_Request)
-		return requestWorldState_Connection() # TODO: NOTHING TO PASS. WHAT DO WE DO?
+		   requestWorldState_Connection = rospy.ServiceProxy("get_state",WorldState_Request)
+		worldState = requestWorldState_Connection()
 	except rospy.ServiceException, e:
 		return None
 
@@ -67,11 +73,13 @@ def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol
 	# Create the network
 	initNetwork()
 
+	requestWorldState()
+
 	rospy.spin()
 
 if __name__ == '__main__':
-	#readParams()
-	initController(5,5,3,3,3,True,"descending",True)
+	readParams()
+	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,isAscending,goalState,isOneArmSolution)
 
 ######################OLD FUNCTIONS########################
 

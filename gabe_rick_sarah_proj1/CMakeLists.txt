@@ -48,6 +48,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Action.msg
+  Command.msg
   Coord.msg
   Grid.msg
   Stack.msg
