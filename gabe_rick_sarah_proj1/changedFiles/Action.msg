@@ -1,0 +1,7 @@
+int32 type
+Target target
+
+int32 OPEN_GRIPPER = 2
+int32 CLOSE_GRIPPER = 3
+int32 MOVE_TO_BLOCK = 5
+int32 MOVE_OVER_BLOCK = 7
