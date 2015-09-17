@@ -14,7 +14,13 @@ worldState = WorldState()
 lastAction = 5; #1st action was action.MOVE_TO_BLOCK
 holding = None;
 lastHeld = None;
-lastTarget = 3;
+lastTarget = 0;
+
+leftLastAction = None;
+leftHolding = None;
+leftLastHeld = None;
+leftLastTarget = None;
+home = [0,0];
 
 #######################WORLD STATE FUNCTIONS########################
 
@@ -44,34 +50,40 @@ def initWorldState(rows,cols):
 	worldState.gripperOpen = True
 	
 
-def initBlocksInStack(ascending,numBlocks,row,col):
+def initBlocksInStack(configuration,numBlocks,row,col):
 	"Put a stack of numBlocks blocks in row,col"
 	# Ascending    Descending
 	#   [3]           [1]
 	#   [2]           [2]
 	#   [1]           [3]
 	#"""""""""""""""""""""""""
+	global home
+	home = [row,col];
 
 	newStack = Stack()
 	newStack.row = row
 	newStack.col = col
-	
-	newStack.blocks = range(1,numBlocks+1)
 
 	global lastTarget 
-	lastTarget = numBlocks
 	
+	if configuration == "stacked_ascending":
+		newStack.blocks = range(1,numBlocks+1)
+		lastTarget = numBlocks
+		worldState.grid.stacks.append(newStack)
+
 	# Reverse the stack if descending
-	if not ascending:
+	if configuration == "stacked_descending":
+		newStack.blocks = range(1,numBlocks+1)
 		newStack.blocks.reverse() 
 		lastTarget = 1
-		print lastTarget
-		
-	# Add stack to blocks
-	worldState.grid.stacks.append(newStack)
-	
-	return newStack
-	
+		worldState.grid.stacks.append(newStack)
+
+	if configuration == "scattered":
+		for i in range (1,numBlocks+1):
+			(row, col) = getRandomTableLocation(0)
+			addBlockToWS(i, row, col)
+		lastTarget = numBlocks	
+			
 def addBlockToWS(blockID, row, col):
 	"Add a block to world state on top of stack"
 	added = False
@@ -107,25 +119,35 @@ def moveBlockInWS(blockID, row, col):
 	addBlockToWS(blockID,row,col)
 	return worldState
 
-def getBlockInfo(blockID):
+def getBlockInfo(blockID, targetType):
 	"Returns block info including depth: 1=top, len=bottom"
 	found = False
 	row = 0
 	col = 0
 	depth = 0
 
-	for stack in worldState.grid.stacks:
-		if blockID in stack.blocks:
-			row = stack.row
-			col = stack.col
-			depth = len(stack.blocks) - stack.blocks.index(blockID)
-			found = True
+	if targetType == -1:
+		for stack in worldState.grid.stacks:
+			if blockID in stack.blocks:
+				row = stack.row
+				col = stack.col
+				depth = len(stack.blocks) - stack.blocks.index(blockID)
+				found = True
 
-	if blockID == 0:
-		(row,col) = getRandomTableLocation()
+	elif targetType == 3:	
+		(row,col) = home
+		depth = 1
+		for stack in worldState.grid.stacks:
+			if stack.row == row and stack.col == col:
+				newBlock = stack.blocks[-1]
+				(found, row, col, depth) = getBlockInfo(newBlock, -1) 
+		found = True		
+
+	else:
+		(row,col) = getRandomTableLocation(targetType)
 		depth = 1
 		found = True	
-	
+
 	return (found,row,col,depth)
 
 def getStackInWS(row,col):
@@ -134,16 +156,26 @@ def getStackInWS(row,col):
 			return stack
 	return None
 
-def getRandomTableLocation():
+def getRandomTableLocation(targetType):
 	"Returns row and column of random open table location"
 	succeeded = False
 	taken = False
 	row = 0
 	col = 0
+	global home
+	homerow = home[0]
+	homecol = home[1]
 	
 	while not succeeded:
-		row = random.randint(0, worldState.grid.dimensions.row)
-		col = random.randint(0, worldState.grid.dimensions.col)
+		if targetType == 0:
+			row = random.randint(0, worldState.grid.dimensions.row)
+			col = random.randint(0, worldState.grid.dimensions.col)
+		elif targetType == 1:	
+			row = random.randint(0, homerow)
+			col = random.randint(0, worldState.grid.dimensions.col)
+		elif targetType == 2:	
+			row = random.randint(homerow, worldState.grid.dimensions.row)
+			col = random.randint(0, worldState.grid.dimensions.col)
 		for stack in worldState.grid.stacks:
 			if row == stack.row and col == stack.col:
 				taken = True
@@ -158,16 +190,18 @@ def moveRobotRequested(req):
 	"Handles requested move from controller. Returns True only if the move is valid. Executes action"
 	
 	# Read in values from request
-	action = req.action
-	target = req.target
+	action = req.rightArmAction
+	target = req.rightArmTarget
+
+	leftAction = req.leftArmAction
+	leftTarget = req.leftArmTarget
 	
-	isblock = target.isblock
-	blockID = target.block
-	row = target.loc.row
-	col = target.loc.col
-	
+	targetType = target.targetType
+	blockID = target.blockID
+
 	gripperIsOpen = getGripperIsOpen()
-	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID, targetType)
+
 	global lastAction	#Previous Command
 	global lastTarget	#Last Targetted blockID
 	global holding		#Block currently held
@@ -176,7 +210,7 @@ def moveRobotRequested(req):
 	#Assume action cannot be done
 	valid = False
 	
-	if isblock:
+	if targetType == -1:
 		# Target is a block
 		if action.type == action.OPEN_GRIPPER:
 			valid = True
@@ -211,7 +245,7 @@ def moveRobotRequested(req):
 					removeBlockFromWS(holding)
 					addBlockToWS(holding, blockRow, blockCol)	
 	
-	elif isblock and blockID == 0:
+	else:
 		if action.type == action.OPEN_GRIPPER:
 			valid = True
 			updateGripperState(True)
@@ -237,12 +271,8 @@ def moveRobotRequested(req):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)			
 	
-	else:
-		# Row and column specified
-		valid = True # TODO
-	
 	#Respond
-	return valid # TODO	
+	return valid
 		
 def getStateRequested(req):
 	"Returns world state upon request"
@@ -271,7 +301,7 @@ def readParams():
 	global numBlocks
 	global blockLocaleRow
 	global blockLocaleCol
-	global isAscending
+	global configuration
 	global goalState
 	global isOneArmSolution
 
@@ -280,19 +310,19 @@ def readParams():
 	numBlocks = rospy.get_param("numBlocks")
 	blockLocaleRow = rospy.get_param("blockLocaleRow")
 	blockLocaleCol = rospy.get_param("blockLocaleCol")
-	isAscending = rospy.get_param("isAscending")
+	configuration = rospy.get_param("configuration")
 	goalState = rospy.get_param("goalState")
 	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 
 # Full setup
-def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSolution):
+def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSolution):
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
 	
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
-	initBlocksInStack(isAscending,numBlocks,blockLocaleRow,blockLocaleCol)
+	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
 	
 	#runTests() # TODO: remove
 
@@ -309,17 +339,17 @@ def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocal
 if __name__ == "__main__":
 	try:
 		ParamsBeingRead = 0
-		readParams(); ParamsBeingRead = 1
+		#readParams(); ParamsBeingRead = 1
 		if ParamsBeingRead == 0:
 			gridRows = 5
 			gridCols = 5
 			numBlocks = 3
-			blockLocaleRow = 0
-			blockLocaleCol = 0
-			isAscending = True
-			goalState = "descending"
+			blockLocaleRow = 3
+			blockLocaleCol = 3
+			configuration = "scattered"
+			goalState = "stacked_descending"
 			isOneArmSolution = False
-		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,isAscending,goalState,isOneArmSolution)
+		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
 	except rospy.ROSInterruptException:
 		pass
 
@@ -378,53 +408,3 @@ def runTests():
 	assert(row==2)
 	assert(col==2)
 	assert(depth==1)
-
-######################OLD CODE########################
-
-#Answers move_robot requests
-def move_robot(req):
-	print "Checking validity" # TODO
-	return true
-
-#Answers get_state requests
-def get_state(req):
-	print "Retrieving state" # TODO
-	return "THIS SHOULD BE THE STATE"	
-
-#Maintains state and publishes
-def robot_interface():
-	rospy.init_node('robot_interface')
-
-	#Pass to move_robot
-	s1 = rospy.Service('move_robot', MoveRobot, move_robot)
-	print "Ready to move robot"
-
-	#Pass to get_state
-	s2 = rospy.Service('get_state', WorldState_Request, get_state)
-	print "Ready to get state"
-
-	#Publisher
-	pub = rospy.Publisher('State', WorldState, queue_size = 10)
-	rate = rospy.Rate(1)
-	#WorldState setup
-	msg = WorldState()
-	msg.grid = Grid()
-	msg.grid.stacks = [Stack() for _ in range(2)]
-	msg.grid.stacks[0].blocks = [Block() for _ in range(1)]
-	msg.grid.stacks[0].blocks[0].id = 1
-	msg.grid.stacks[0].row = 2
-	msg.grid.stacks[0].col = 2
-	msg.grid.stacks[1].blocks = [Block() for _ in range(1)]
-	msg.grid.stacks[1].blocks[0].id = 3
-	msg.grid.stacks[1].row = 1
-	msg.grid.stacks[1].col = 0
-	msg.grid.dimensions = Coord()
-	msg.grid.dimensions.row = 5
-	msg.grid.dimensions.col = 5
-	while not rospy.is_shutdown():
-		rospy.loginfo(msg)
-		pub.publish(msg)
-		rate.sleep()
-
-
-	

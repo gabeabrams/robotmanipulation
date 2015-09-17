@@ -1,4 +1,7 @@
-Action action
-Target target
+Action rightArmAction
+Action leftArmAction
+
+Target rightArmTarget
+Target leftArmTarget
 ---
 bool success

@@ -1,3 +1,8 @@
-bool isblock
-int32 block
-Coord loc
+int32 blockID
+int32 targetType
+
+int32 BLOCK = -1
+int32 TABLE=0
+int32 TABLE_LEFT=1
+int32 TABLE_RIGHT=2
+int32 TABLE_HOME=3

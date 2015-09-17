@@ -1,16 +1,16 @@
 <launch>
 
-	<node name = "controller" pkg = "gabe_ricky_sarah_proj1" type = "controller" />
+	<node name = "controller" pkg = "gabe_ricky_sarah_proj1" type = "controller.py" />
 
-	<node name = "robot_interface" pkg = "gabe_ricky_sarah_proj1" type = "robot_interface" />
+	<node name = "robot_interface" pkg = "gabe_ricky_sarah_proj1" type = "robot_interface.py" />
 
-	<param name = "gridRows" value = 5 />
-	<param name = "gridCols" value = 5 />
-	<param name = "numBlocks" value = 4 />
-	<param name = "blockLocaleRow" value = 3 />
-	<param name = "blockLocaleCol" value = 3 />
-	<param name = "isAscending" value = "true" />
+	<param name = "gridRows" value = "5" />
+	<param name = "gridCols" value = "5" />
+	<param name = "numBlocks" value = "3" />
+	<param name = "blockLocaleRow" value = "3" />
+	<param name = "blockLocaleCol" value = "3" />
+	<param name = "isAscending" value = "Ascending" />
 	<param name = "goalState" value = "Descending" />
-	<param name = "isOneArmSolution" value = "false" />
+	<param name = "isOneArmSolution" value = "True" />
 
 </launch>

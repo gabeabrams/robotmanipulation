@@ -52,7 +52,7 @@ def readParams():
 	global numBlocks
 	global blockLocaleRow
 	global blockLocaleCol
-	global isAscending
+	global configuration
 	global goalState
 	global isOneArmSolution
 	
@@ -61,11 +61,11 @@ def readParams():
 	numBlocks = rospy.get_param("numBlocks")
 	blockLocaleRow = rospy.get_param("blockLocaleRow")
 	blockLocaleCol = rospy.get_param("blockLocaleCol")
-	isAscending = rospy.get_param("isAscending")
+	configuration = rospy.get_param("configuration")
 	goalState = rospy.get_param("goalState")
 	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 	
-def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, isAscending, goalState, isOneArmSpolution):
+def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSpolution):
 	"First function to initialize the controller node"
 	# Create controller node
 	rospy.init_node("controller")
@@ -78,47 +78,15 @@ def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol
 	rospy.spin()
 
 if __name__ == '__main__':
-	readParams()
-	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,isAscending,goalState,isOneArmSolution)
-
-######################OLD FUNCTIONS########################
-
-#Reacts to command topic
-def ControlMode(data):
-	return 1
-	#Recalculate command list iff command changes
-
-#Reacts to worldstate topic
-def StateKeeper(data):
-	return 1
-	#Change locally held state variables
-
-
-def controller():
-	rospy.init_node('controller')
-
-	#Subscribe to /command
-	rospy.Subscriber("command", String, ControlMode) # ???? WHAT IS THIS?
-	#Subscribe to /worldstate
-	rospy.Subscriber('State', WorldState, StateKeeper)
-
-	#Call Service worldstate
-	try:
-	    get_state = rospy.ServiceProxy('get_state', WorldState_Request)
-		#get state
-		#change locally held state variables
-	except rospy.ServiceException, e:	
-		return 1
-
-	#Call Service moverobot 
-	try:
-	    move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
-	    return 1
-		#place move requests
-		#if true, continue
-		#if false, recalculate commands
-	except rospy.ServiceException, e:	
-		return 1
-
-	rospy.spin()	
-
+	ParamsBeingRead = 0
+	#readParams(); ParamsBeingRead = 1
+	if ParamsBeingRead == 0:
+		gridRows = 5
+		gridCols = 5
+		numBlocks = 3
+		blockLocaleRow = 3
+		blockLocaleCol = 3
+		configuration = "ascending"
+		goalState = "descending"
+		isOneArmSolution = False
+	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)

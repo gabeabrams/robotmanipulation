@@ -7,10 +7,10 @@
 	<param name = "gridRows" value = "5" />
 	<param name = "gridCols" value = "5" />
 	<param name = "numBlocks" value = "3" />
-	<param name = "blockLocaleRow" value = "0" />
-	<param name = "blockLocaleCol" value = "0" />
-	<param name = "isAscending" value = "true" />
+	<param name = "blockLocaleRow" value = "3" />
+	<param name = "blockLocaleCol" value = "3" />
+	<param name = "configuration" value = "Ascending" />
 	<param name = "goalState" value = "Descending" />
-	<param name = "isOneArmSolution" value = "false" />
+	<param name = "isOneArmSolution" value = "True" />
 
 </launch>
