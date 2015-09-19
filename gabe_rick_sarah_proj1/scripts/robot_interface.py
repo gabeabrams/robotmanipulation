@@ -11,15 +11,18 @@ from gabe_ricky_sarah_proj1.msg import*
 worldState = WorldState()
 
 #Save the last action performed
-lastAction = 5; #1st action was action.MOVE_TO_BLOCK
-holding = None;
-lastHeld = None;
-lastTarget = 0;
+rightLastAction = 5; #1st action was action.MOVE_TO_BLOCK
+rightHolding = None;
+rightLastHeld = None;
+rightLastTarget = 0;
+rightLastOver = -3;
 
 leftLastAction = None;
 leftHolding = None;
 leftLastHeld = None;
 leftLastTarget = None;
+leftLastOver = 0;
+
 home = [0,0];
 
 #######################WORLD STATE FUNCTIONS########################
@@ -28,14 +31,22 @@ def getWorldState():
 	"Get the world state object"
 	return worldState
 	
-def updateGripperState(isOpen):
+def updateGripperState(isOpen, side):
 	"Change the gripper state in worldState"
 	global worldState
-	worldState.gripperOpen = isOpen
+	if side == 'right':
+		worldState.rightGripperOpen = isOpen
+	if side == 'left':
+		worldState.leftGripperOpen = isOpen
 
-def getGripperIsOpen():
+def getGripperIsOpen(side):
 	global worldState
-	return worldState.gripperOpen
+	if side == 'right':
+		return worldState.rightGripperOpen
+	if side == 'left':
+		return worldState.leftGripperOpen
+	else:
+		return True	
 	
 def initWorldState(rows,cols):
 	"Initialize the world state with an empty grid"
@@ -47,7 +58,8 @@ def initWorldState(rows,cols):
 	worldState.grid.dimensions.row = rows
 	worldState.grid.dimensions.col = cols
 	
-	worldState.gripperOpen = True
+	worldState.rightGripperOpen = True
+	worldState.leftGripperOpen = True
 	
 
 def initBlocksInStack(configuration,numBlocks,row,col):
@@ -64,25 +76,25 @@ def initBlocksInStack(configuration,numBlocks,row,col):
 	newStack.row = row
 	newStack.col = col
 
-	global lastTarget 
+	global rightLastTarget 
 	
 	if configuration == "stacked_ascending":
 		newStack.blocks = range(1,numBlocks+1)
-		lastTarget = numBlocks
+		rightLastTarget = numBlocks
 		worldState.grid.stacks.append(newStack)
 
 	# Reverse the stack if descending
 	if configuration == "stacked_descending":
 		newStack.blocks = range(1,numBlocks+1)
 		newStack.blocks.reverse() 
-		lastTarget = 1
+		rightLastTarget = 1
 		worldState.grid.stacks.append(newStack)
 
 	if configuration == "scattered":
 		for i in range (1,numBlocks+1):
-			(row, col) = getRandomTableLocation(0)
+			(row, col) = getRandomTableLocation(-3)
 			addBlockToWS(i, row, col)
-		lastTarget = numBlocks	
+		rightLastTarget = numBlocks	
 			
 def addBlockToWS(blockID, row, col):
 	"Add a block to world state on top of stack"
@@ -119,14 +131,14 @@ def moveBlockInWS(blockID, row, col):
 	addBlockToWS(blockID,row,col)
 	return worldState
 
-def getBlockInfo(blockID, targetType):
+def getBlockInfo(blockID):
 	"Returns block info including depth: 1=top, len=bottom"
 	found = False
 	row = 0
 	col = 0
 	depth = 0
 
-	if targetType == -1:
+	if blockID > 0:
 		for stack in worldState.grid.stacks:
 			if blockID in stack.blocks:
 				row = stack.row
@@ -134,17 +146,17 @@ def getBlockInfo(blockID, targetType):
 				depth = len(stack.blocks) - stack.blocks.index(blockID)
 				found = True
 
-	elif targetType == 3:	
+	elif blockID == 0:	
 		(row,col) = home
 		depth = 1
 		for stack in worldState.grid.stacks:
 			if stack.row == row and stack.col == col:
 				newBlock = stack.blocks[-1]
-				(found, row, col, depth) = getBlockInfo(newBlock, -1) 
+				(found, row, col, depth) = getBlockInfo(newBlock) 
 		found = True		
 
 	else:
-		(row,col) = getRandomTableLocation(targetType)
+		(row,col) = getRandomTableLocation(blockID)
 		depth = 1
 		found = True	
 
@@ -156,7 +168,7 @@ def getStackInWS(row,col):
 			return stack
 	return None
 
-def getRandomTableLocation(targetType):
+def getRandomTableLocation(blockID):
 	"Returns row and column of random open table location"
 	succeeded = False
 	taken = False
@@ -167,13 +179,13 @@ def getRandomTableLocation(targetType):
 	homecol = home[1]
 	
 	while not succeeded:
-		if targetType == 0:
+		if blockID == -3:
 			row = random.randint(0, worldState.grid.dimensions.row)
 			col = random.randint(0, worldState.grid.dimensions.col)
-		elif targetType == 1:	
+		elif blockID == -1:	
 			row = random.randint(0, homerow)
 			col = random.randint(0, worldState.grid.dimensions.col)
-		elif targetType == 2:	
+		elif blockID == -2:	
 			row = random.randint(homerow, worldState.grid.dimensions.row)
 			col = random.randint(0, worldState.grid.dimensions.col)
 		for stack in worldState.grid.stacks:
@@ -182,98 +194,252 @@ def getRandomTableLocation(targetType):
 		succeeded = not taken
 
 	return (row,col)	
+
+def Mover(action, target, arm):
+
+	blockID = target.blockID
+
+	gripperIsOpen = getGripperIsOpen(arm)
+	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+
+	global rightLastTarget
+	global rightLastAction
+	global rightHolding
+	global rightLastHeld
+	global rightLastOver
+
+	global leftLastTarget
+	global leftLastAction
+	global leftHolding
+	global leftLastHeld
+	global leftLastOver	
+
+	if arm == 'right':
+		holding = rightHolding
+		lastHeld = rightLastHeld
+		lastAction = rightLastAction
+		lastTarget = rightLastTarget
+		lastOver = rightLastOver
+
+	elif arm == 'left':
+		holding = leftHolding
+		lastHeld = leftLastHeld
+		lastAction = leftLastAction
+		lastTarget = leftLastTarget
+		lastOver = leftLastOver
+
+	#Assume action cannot be done
+	if blockID > target.TABLE_HOME:
+		# Target is a block
+		if action.type == action.OPEN_GRIPPER:
+			updateGripperState(True, arm)
+			if holding != None:				# Prevents errors from unnecessary opening
+				lastHeld = holding 			# Update last held block
+			holding = None 					# No longer holding block	
+
+		elif action.type == action.CLOSE_GRIPPER:
+			updateGripperState(False, arm)
+			if lastAction == action.OPEN_GRIPPER:
+				holding = lastHeld
+			if lastAction == action.MOVE_TO_BLOCK:
+				holding = lastTarget
+			lastAction = action.CLOSE_GRIPPER	
+
+		elif action.type == action.MOVE_TO_BLOCK:
+			lastAction = action.MOVE_TO_BLOCK
+			lastTarget = blockID
+
+		elif action.type == action.MOVE_OVER_BLOCK:
+			lastAction = action.MOVE_OVER_BLOCK
+			if (holding != None):
+				removeBlockFromWS(holding)
+				addBlockToWS(holding, blockRow, blockCol)
+			lastOver = blockID		
 	
+	else:
+		if action.type == action.MOVE_OVER_BLOCK:
+			lastAction = action.MOVE_OVER_BLOCK
+			if (holding != None):
+				removeBlockFromWS(holding)
+				addBlockToWS(holding, blockRow, blockCol)
+			lastOver = blockID				
+	
+	if arm == 'right':
+		rightHolding = holding
+		rightLastHeld = lastHeld
+		rightLastAction = lastAction
+		rightLastTarget = lastTarget
+		rightLastOver = lastOver
+
+	if arm == 'left':
+		leftHolding = holding
+		leftLastHeld = lastHeld
+		leftLastAction = lastAction
+		leftLastTarget = lastTarget
+		leftLastOver = lastOver	
+
+def oneArmChecker(action, target, arm):
+
+	blockID = target.blockID
+
+	gripperIsOpen = getGripperIsOpen(arm)
+	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+
+	global rightLastTarget
+	global rightLastAction
+	global rightHolding
+	global rightLastHeld
+	global rightLastOver
+
+	global leftLastTarget
+	global leftLastAction
+	global leftHolding
+	global leftLastHeld
+	global leftLastOver
+
+	if arm == 'right':
+		holding = rightHolding
+		lastHeld = rightLastHeld
+		lastAction = rightLastAction
+		lastTarget = rightLastTarget
+
+	elif arm == 'left':
+		holding = leftHolding
+		lastHeld = leftLastHeld
+		lastAction = leftLastAction
+		lastTarget = leftLastTarget	
+
+	#Assume action cannot be done
+	valid = False
+
+	if action.type == action.STILL:
+		valid = True
+		return valid
+	
+	if blockID > target.TABLE_HOME:
+		# Target is a block
+		if action.type == action.OPEN_GRIPPER:
+			valid = True
+
+		elif action.type == action.CLOSE_GRIPPER:
+			valid = True
+
+		elif action.type == action.MOVE_TO_BLOCK:
+			top = (blockDepth == 1)
+			gOpen = gripperIsOpen
+			alreadyOver = (lastAction == action.MOVE_OVER_BLOCK)
+			valid = (top and gOpen and alreadyOver)
+
+		elif action.type == action.MOVE_OVER_BLOCK:
+			top = (blockDepth == 1)
+			notSelf = (rightHolding != blockID)
+			valid = (top and notSelf)			
+	
+	else:
+		if action.type == action.MOVE_OVER_BLOCK:
+			valid = True			
+
+	return valid
+
+def twoArmChecker(rightAction, leftAction, rightTarget, leftTarget):
+
+	rightBlockID = rightTarget.blockID
+	leftBlockID = leftTarget.blockID
+
+	rightGripperIsOpen = getGripperIsOpen('right')
+	leftGripperIsOpen = getGripperIsOpen('left')
+
+	(rightBlockFound, rightBlockRow, rightBlockCol, rightblockDepth) = getBlockInfo(rightBlockID)
+	(leftBlockFound, leftBlockRow, leftBlockCol, leftBlockDepth) = getBlockInfo(leftBlockID)	
+
+	global rightLastAction
+	global rightLastTarget
+	global rightLastHeld
+	global rightHolding
+
+	global leftLastAction
+	global leftLastTarget
+	global rightLastHeld
+	global rightHolding
+
+	valid = False
+
+	rightValid = oneArmChecker(rightAction, rightTarget, 'right')
+	leftValid = oneArmChecker(leftAction, leftTarget, 'left')
+	if (rightValid == False) or (leftValid == False):
+		#One of the actions is invalid on its own
+		valid = False
+		return valid
+
+	if (rightAction.type == rightAction.STILL) or (leftAction.type == leftAction.STILL):
+		valid = True
+		return valid	
+
+	if (rightAction.type == rightAction.OPEN_GRIPPER) or \
+	(rightAction.type == rightAction.CLOSE_GRIPPER) or \
+	(rightAction.type == rightAction.MOVE_TO_BLOCK):
+		
+		if leftAction.type == leftAction.OPEN_GRIPPER:
+			valid = True
+
+		if leftAction.type == leftAction.CLOSE_GRIPPER:
+			valid = True
+
+		if leftAction.type == leftAction.MOVE_TO_BLOCK:
+			valid = True
+
+		if leftAction.type == leftAction.MOVE_OVER_BLOCK:
+			if (leftBlockID != rightLastOver) or (leftBlockID < leftTarget.TABLE_HOME):
+				#Left is not moving to where right is
+				valid = True
+
+		
+	if rightAction.type == rightAction.MOVE_OVER_BLOCK:
+
+		if leftAction.type == leftAction.OPEN_GRIPPER:
+			if (rightBlockID != leftLastOver) or (rightBlockID < rightTarget.TABLE_HOME):
+				#Right is not moving to where left is
+				valid = True
+
+		if leftAction.type == leftAction.CLOSE_GRIPPER:
+			if (rightBlockID != leftLastOver) or (rightBlockID < rightTarget.TABLE_HOME):
+				#Right is not moving to where left is
+				valid = True
+
+		if leftAction.type == leftAction.MOVE_TO_BLOCK:
+			if (rightBlockID != leftLastOver) or (rightBlockID < rightTarget.TABLE_HOME):
+				#Right is not moving to where left is
+				valid = True
+
+		if leftAction.type == leftAction.MOVE_OVER_BLOCK:
+			if (rightBlockID != leftLastOver) or (rightBlockID < rightTarget.TABLE_HOME):
+				#Right is not moving to where left is
+				if (leftBlockID != rightBlockID) or (rightBlockID < rightTarget.TABLE_HOME):
+				#Left is not moving to where right will be post-move
+					valid = True
+
+	return valid	
+
+
 ######################NETWORKING FUNCTIONS########################
 
 # Network listeners
 def moveRobotRequested(req):
 	"Handles requested move from controller. Returns True only if the move is valid. Executes action"
 	
-	# Read in values from request
-	action = req.rightArmAction
-	target = req.rightArmTarget
+	if isOneArmSolution:
+		valid = oneArmChecker(req.rightArmAction, req.rightArmTarget, 'right')
+		if valid:
+			Mover(req.rightArmAction, req.rightArmTarget, 'right')
 
-	leftAction = req.leftArmAction
-	leftTarget = req.leftArmTarget
-	
-	targetType = target.targetType
-	blockID = target.blockID
-
-	gripperIsOpen = getGripperIsOpen()
-	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID, targetType)
-
-	global lastAction	#Previous Command
-	global lastTarget	#Last Targetted blockID
-	global holding		#Block currently held
-	global lastHeld		#Last held block
-
-	#Assume action cannot be done
-	valid = False
-	
-	if targetType == -1:
-		# Target is a block
-		if action.type == action.OPEN_GRIPPER:
-			valid = True
-			updateGripperState(True)
-			if holding != None:		# Prevents errors from unnecessary opening
-				lastHeld = holding 	# Update last held block
-			holding = None 			# No longer holding block
-
-		elif action.type == action.CLOSE_GRIPPER:
-			valid = True
-			updateGripperState(False)
-			if lastAction == action.OPEN_GRIPPER:
-				holding = lastHeld
-			if lastAction == action.MOVE_TO_BLOCK:
-				holding = lastTarget
-
-		elif action.type == action.MOVE_TO_BLOCK:
-			top = (blockDepth == 1)
-			gOpen = gripperIsOpen
-			valid = (top and gOpen)
-			if valid:
-				lastAction = action.MOVE_TO_BLOCK
-				lastTarget = blockID
-
-		elif action.type == action.MOVE_OVER_BLOCK:
-			top = (blockDepth == 1)
-			notSelf = (holding != blockID)
-			valid = (top and notSelf)		
-			if valid:
-				lastAction = action.MOVE_OVER_BLOCK
-				if (holding != None):
-					removeBlockFromWS(holding)
-					addBlockToWS(holding, blockRow, blockCol)	
-	
 	else:
-		if action.type == action.OPEN_GRIPPER:
-			valid = True
-			updateGripperState(True)
-			if holding != None:		# Prevents errors from unnecessary opening
-				lastHeld = holding 	# Update last held block
-			holding = None 			# No longer holding block
+		valid = twoArmChecker(req.rightArmAction, req.leftArmAction, req.rightArmTarget, req.leftArmTarget)	
+		if valid:
+			Mover(req.rightArmAction, req.rightArmTarget, 'right')
+			Mover(req.leftArmAction, req.leftArmTarget, 'left')
 
-		elif action.type == action.CLOSE_GRIPPER:
-			valid = True
-			updateGripperState(False)
-			if lastAction == action.OPEN_GRIPPER:
-				holding = lastHeld
-			if lastAction == action.MOVE_TO_BLOCK:
-				holding == lastTarget
-
-		elif action.type == action.MOVE_TO_BLOCK:
-			valid = False
-
-		elif action.type == action.MOVE_OVER_BLOCK:
-			valid = True
-			lastAction = action.MOVE_OVER_BLOCK
-			if (holding != None):
-				removeBlockFromWS(holding)
-				addBlockToWS(holding, blockRow, blockCol)			
-	
-	#Respond
 	return valid
-		
+
 def getStateRequested(req):
 	"Returns world state upon request"
 	requestString = req.request
@@ -323,7 +489,6 @@ def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocal
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	
 	#runTests() # TODO: remove
 
 	# Initialize network

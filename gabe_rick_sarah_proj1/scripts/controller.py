@@ -5,10 +5,13 @@ from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
 from std_msgs.msg import String
 
+import move_planner
+
 #########################GLOBAL DATA###########################
 
 requestWorldState_Connection = None
 worldState = WorldState()
+goalState = ""
 
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
@@ -18,11 +21,22 @@ def worldStateReceived(data):
 
 def commandReceived(data):
 	"Handles custom commands from terminal"
-	# Receives commands from terminal
+	if data != goalState
+		goalState = data
+		move_planner.fallback(worldState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
 	return 1
 
 def moveRobotRequest():
-	return 1
+	rospy.wait_for_service('move_robot')
+	try:
+		robotMoved = rospy.ServiceProxy("move_robot",MoveRobot)
+		if robotMoved != True:
+			requestWorldState()
+			move_planner.fallback(worldState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
+		else:
+			"Continue with next command"
+			return 1
+	except rospy.ServiceException, e:
 
 def requestWorldState():
 	"Requests the world state from robot_interface"

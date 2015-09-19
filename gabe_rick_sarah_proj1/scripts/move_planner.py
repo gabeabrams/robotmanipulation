@@ -25,7 +25,7 @@ def moveToCenterStackLocation():
 
 def moveAboveTable(area):
 	# area: 0=either, 1=left, 2=right
-	return "move to table are " + str(area) # Todo
+	return "move over table area " + str(area) # Todo
 
 def still():
 	return "still              "
@@ -37,6 +37,7 @@ def still():
 # 3 THEN 3
 def padScatterBlock():
 	return [still(),still(),still(),still()]
+	
 def scatterBlock(blockID,area):
 	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(area),openGripper(),still(),still()]
 
@@ -44,6 +45,7 @@ def scatterBlock(blockID,area):
 # 4 THEN 4
 def padStackBlock():
 	return [still(),still(),still()]
+
 def stackBlock(moveID,destID):
 	if destID == None:
 		centerAction = moveToCenterStackLocation()

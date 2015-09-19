@@ -1,2 +1,3 @@
 Grid grid
-bool gripperOpen
+bool rightGripperOpen
+bool leftGripperOpen
