@@ -1,34 +1,6 @@
 #!/usr/bin/env python
 
-#import rospy
-#from gabe_ricky_sarah_proj1.srv import*
-#from gabe_ricky_sarah_proj1.msg import*
-#from std_msgs.msg import String
-
-# TODO: First few actions already done
-
-# SIMPLE ACTIONS
-def openGripper():
-	return "open gripper       " # Todo
-
-def closeGripper():
-	return "close gripper      " # Todo
-
-def moveToBlock(blockID):
-	return "move to block     " + str(blockID) # Todo HANDLE ROW COL if blockID = -1 (center spot)
-
-def moveOverBlock(blockID):
-	return "move over block   " + str(blockID) # Todo HANDLE ROW COL if blockID = -1 (center spot)
-
-def moveToCenterStackLocation():
-	return "move to center     " # Todo
-
-def moveAboveTable(area):
-	# area: 0=either, 1=left, 2=right
-	return "move over table area " + str(area) # Todo
-
-def still():
-	return "still              "
+import action_handler
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
@@ -216,5 +188,3 @@ for i in range(len(leftActions)):
 	left = leftActions[i]
 	right = rightActions[i]
 	print(left + "\t" + right)
-
-
