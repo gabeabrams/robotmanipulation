@@ -12,6 +12,9 @@ def padScatterBlock():
 	
 def scatterBlock(blockID,area):
 	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(area),openGripper(),still(),still()]
+	
+def scatterOnto(blockID,blockIDBelow):
+	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveOverBlock(blockIDBelow),openGripper(),still(),still()]
 
 # During this phase, tuple order is: (OUTSKIRTS, CENTER)
 # 4 THEN 4
@@ -39,9 +42,11 @@ def translateStateInfo(startIn, endIn):
 		endOut = 3
 	if endIn == "stacked_descending":
 		endOut = 2
+	if endIn == "sorted_odd_even":
+		endOut = 4
 	return (startOut,endOut)
 	
-def oneArm(startState,endState,stackRow,stackCol,numBlocks):
+def oneArm(startState,endState,numBlocks):
 	startI,endI = translateStateInfo(startState,endState) # 1=ascending, 2=descending
 	
 	# If already done, return
@@ -49,13 +54,14 @@ def oneArm(startState,endState,stackRow,stackCol,numBlocks):
 		return []
 	
 	# Scatter blocks
-	scatterOrder = range(1,numBlocks+1)
-	if(startI == 1):
-		scatterOrder.reverse()
+	if not startI == 3:
+		scatterOrder = range(1,numBlocks+1)
+		if(startI == 1):
+			scatterOrder.reverse()
 	
-	rightActions = []
-	for blockID in scatterOrder:
-		rightActions += scatterBlock(blockID,0)
+		rightActions = []
+		for blockID in scatterOrder:
+			rightActions += scatterBlock(blockID,0)
 			
 	# If final state is scatter, we're done!
 	if endI == 3:
@@ -73,7 +79,7 @@ def oneArm(startState,endState,stackRow,stackCol,numBlocks):
 	
 	return rightActions
 
-def twoArms(startState,endState,stackRow,stackCol,numBlocks):
+def twoArms(startState,endState,numBlocks):
 	startI,endI = translateStateInfo(startState,endState) # 1=ascending, 2=descending
 	
 	# If already done, return
@@ -89,14 +95,36 @@ def twoArms(startState,endState,stackRow,stackCol,numBlocks):
 	rightActions = []
 	leftActions = padScatterBlock()
 	
+	# Odd/Even Sorting
+	leftBottomID = -1
+	rightBottomID = -1
+	
 	for blockID in scatterOrder:
 		if len(rightActions) < len(leftActions):
-			rightActions += scatterBlock(blockID,2)
+			# Moving blockID to right side
+			if endI == 4:
+				if rightBottomID == -1:
+					rightBottomID = blockID
+					rightActions += scatterBlock(blockID,2)
+				else:
+					rightActions += scatterOnto(blockID,rightBottomID)
+			else:
+				rightActions += scatterBlock(blockID,2)
+			
 		else:
-			leftActions += scatterBlock(blockID,1)
+			# Moving blockID to left side
+			if endI == 4:
+				if leftBottomID == -1:
+					leftBottomID = blockID
+					leftActions += scatterBlock(blockID,1)
+				else:
+					leftActions += scatterOnto(blockID,leftBottomID)
+			else:
+				leftActions += scatterBlock(blockID,1)
+			
 	
 	# If final state is scatter, we're done!
-	if endI == 3:
+	if endI == 3 or endI == 4:
 		return rightActions
 	
 	# Synchronize
@@ -104,14 +132,9 @@ def twoArms(startState,endState,stackRow,stackCol,numBlocks):
 		leftActions = leftActions + padScatterBlock()
 	else:
 		rightActions = rightActions + padScatterBlock()
-	# Stagger TODO: right always go first okay?
+		
+	# Stagger
 	leftActions += padStackBlock() # right goes first
-	#if numBlocks % 2 == 1:
-	#	# If odd number of blocks, right has to start both times
-	#	leftActions = leftActions + padStackBlock()
-	#else:
-	#	rightActions = rightActions + padStackBlock()
-	
 	
 	# Re-stack blocks
 	stackOrder = range(1,numBlocks+1)
@@ -137,7 +160,7 @@ def twoArms(startState,endState,stackRow,stackCol,numBlocks):
 # FALLBACK
 
 # Uses one arm to finish operation
-def fallback(worldState,finalState,stackRow,stackCol,numBlocks):
+def fallback(worldState,finalState,numBlocks):
 	endState,_ = translateStateInfo(finalState,finalState)
 	
 	# Scatter first
