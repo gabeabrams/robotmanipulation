@@ -11,6 +11,7 @@ from std_msgs.msg import String
 def openGripper():
 	return createAction(GRIPPER_TARGET,OPEN_OPERATION, "open gripper       ")
 
+
 def closeGripper():
 	return createAction(GRIPPER_TARGET,CLOSE_OPERATION, "close gripper      ")
 
@@ -44,7 +45,27 @@ MOVE_TO_OPERATION = 4
 NO_OPERATION = 5
 
 def createDormantAction(target, operation):
-	return (target, operation)
+	createDormantAction(target,operation,"")
+def createDormantAction(target, operation, text):
+	act = Action()
+	tar = Target()
+	if operation == OPEN_OPERATION:
+		act.type = 2
+		tar.blockID = 1
+	if operation == CLOSE_OPERATION:
+		act.type = 3
+		tar.blockID = 1
+	if operation == MOVE_OVER_OPERATION:
+		act.type = 7
+		tar.blockID = target
+	if operation == MOVE_TO_OPERATION:
+		act.type = 5
+		tar.blockID = target
+	if operation == STILL:
+		act.type = 11
+		tar.blockID = 1
+		
+	return (act,target,text)
 
 def runAction(dormantAction):
 	runAction(dormantActionLeft, createDormantAction(NO_TARGET,NO_OPERATION))
@@ -52,7 +73,8 @@ def runAction(dormantAction):
 # WHEN CHANGING GRIPPER, TARGET=BLOCK
 
 def runAction(dormantActionLeft, dormantActionRight):
-	# TODO: Create actions
+	(action1,target1,text1) = dormantActionLeft
+	(action2,target2,text2) = dormantActionRight
    	rospy.wait_for_service('move_robot')
    	try:
     	move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot) # TODO: DO WE HAVE TO DO THIS EVERY TIME? OR SHOULD WE PASS THIS IN
