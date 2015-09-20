@@ -9,7 +9,6 @@ import move_planner
 
 #########################GLOBAL DATA###########################
 
-requestWorldState_Connection = None
 worldState = WorldState()
 goalState = ""
 stepNumber = 0
@@ -49,9 +48,8 @@ def requestWorldState():
 	global requestWorldState_Connection
 	global worldState
 	try:
-		if requestWorldState_Connection == None:
-		   requestWorldState_Connection = rospy.ServiceProxy("get_state",WorldState_Request)
-		   worldState = requestWorldState_Connection()
+		WorldStateRequest = rospy.ServiceProxy("get_state",WorldState_Request)
+		worldState = WorldStateRequest('Whirled steight pls')
 	except rospy.ServiceException, e:
 		return None
 
