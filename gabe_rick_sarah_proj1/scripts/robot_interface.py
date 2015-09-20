@@ -191,6 +191,8 @@ def getRandomTableLocation(blockID):
 		for stack in worldState.grid.stacks:
 			if row == stack.row and col == stack.col:
 				taken = True
+			if row == homerow and col == homecol:
+				taken = True	
 		succeeded = not taken
 
 	return (row,col)	
@@ -513,7 +515,7 @@ if __name__ == "__main__":
 			blockLocaleCol = 3
 			configuration = "scattered"
 			goalState = "stacked_descending"
-			isOneArmSolution = False
+			isOneArmSolution = True
 		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
 	except rospy.ROSInterruptException:
 		pass

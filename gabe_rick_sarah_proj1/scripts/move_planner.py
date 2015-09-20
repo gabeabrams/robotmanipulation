@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import action_handler
+#import action_handler
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
@@ -176,15 +176,15 @@ def fallback(worldState,finalState,stackRow,stackCol,numBlocks):
 
 # TESTS
 
-print ("\nOne arm solution:\n")
+#print ("\nOne arm solution:\n")
 
-for item in oneArm("stacked_ascending","scattered",0,0,3):
-	print(item)
+#for item in oneArm("stacked_ascending","scattered",0,0,3):
+#	print(item)
 
-print ("\n\nTwo arm solution:\n")
-
-(leftActions,rightActions) = twoArms("stacked_descending","stacked_ascending",0,0,4)
-for i in range(len(leftActions)):
-	left = leftActions[i]
-	right = rightActions[i]
-	print(left + "\t" + right)
+#print ("\n\nTwo arm solution:\n")
+#
+#(leftActions,rightActions) = twoArms("stacked_descending","stacked_ascending",0,0,4)
+#for i in range(len(leftActions)):
+#	left = leftActions[i]
+#	right = rightActions[i]
+#	print(left + "\t" + right)

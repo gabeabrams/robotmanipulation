@@ -25,7 +25,7 @@ def worldStateReceived(data):
 
 def commandReceived(data):
 	#Handles custom commands from terminal
-	if data != goalState:
+	if data != goalState
 		goalState = data
 		requestworldState()
 		startAnActionList(True)
@@ -40,11 +40,11 @@ def moveRobotRequest(req):
 			startAnActionList(True)
 		else:
 			stepNumber += 1
+
 	except rospy.ServiceException, e:
-		"Nothing happens"
 
 def requestWorldState():
-	#Requests the world state from robot_interface
+	"Requests the world state from robot_interface"
 	rospy.wait_for_service('get_state')
 	global requestWorldState_Connection
 	global worldState
@@ -78,7 +78,7 @@ def startAnActionList(isFallback):
 	stepNumber = 1
 	totalSteps = len(ServiceCallList)
 
-	while stepNumber <= totalSteps:
+	while stepNumber <= totalSteps
 		finishedState = ""
 		moveRobotRequest(ServiceCallList[stepNumber-1])
 		stepNumber += 1
