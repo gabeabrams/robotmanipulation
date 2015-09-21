@@ -343,7 +343,7 @@ def oneArmChecker(action, target, arm):
 
 	return valid
 
-def twoArmChecker(rightAction, leftAction, rightTarget, leftTarget):
+def twoArmChecker(rightAction, rightTarget, leftAction, leftTarget):
 
 	rightBlockID = rightTarget.blockID
 	leftBlockID = leftTarget.blockID
@@ -435,7 +435,7 @@ def moveRobotRequested(req):
 			Mover(req.rightArmAction, req.rightArmTarget, 'right')
 
 	else:
-		valid = twoArmChecker(req.rightArmAction, req.leftArmAction, req.rightArmTarget, req.leftArmTarget)	
+		valid = twoArmChecker(req.rightArmAction, req.rightArmTarget, req.leftArmAction, req.leftArmTarget)	
 		if valid:
 			Mover(req.rightArmAction, req.rightArmTarget, 'right')
 			Mover(req.leftArmAction, req.leftArmTarget, 'left')
@@ -513,9 +513,9 @@ if __name__ == "__main__":
 			numBlocks = 3
 			blockLocaleRow = 3
 			blockLocaleCol = 3
-			configuration = "scattered"
-			goalState = "stacked_descending"
-			isOneArmSolution = True
+			configuration = "stacked_ascending"
+			goalState = "sorted_odd_even"
+			isOneArmSolution = False
 		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
 	except rospy.ROSInterruptException:
 		pass

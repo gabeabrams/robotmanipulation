@@ -6,10 +6,10 @@
 #from std_msgs.msg import String
 
 BLOCK_TARGET = 1 # Any positive number = blockID
-TABLE_TARGET = -3
+TABLE_TARGET = 0
 TABLE_LEFT_TARGET = -1
 TABLE_RIGHT_TARGET = -2
-HOME_TARGET = 0
+HOME_TARGET = -3
 GRIPPER_TARGET = -4
 NO_TARGET = -5
 
@@ -18,11 +18,6 @@ CLOSE_OPERATION = 2
 MOVE_OVER_OPERATION = 3
 MOVE_TO_OPERATION = 4
 NO_OPERATION = 5
-
-import rospy
-from gabe_ricky_sarah_proj1.srv import*
-from gabe_ricky_sarah_proj1.msg import*
-from std_msgs.msg import String
 ##################################ACTION HANDLER########################################
 
 # SIMPLE ACTIONS
@@ -69,8 +64,8 @@ def createDormantAction(target, operation, text):
 	if operation == NO_OPERATION: # Still
 		act.type = 11
 		tar.blockID = 1
-
-	return (act,tar,text)
+		
+	return (act,target,text)
 
 ##################################MOVE PLANNER########################################
 
@@ -79,12 +74,12 @@ def createDormantAction(target, operation, text):
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
 
-def padGeneral(rightActions,leftActions):
+def padGeneral(leftActions,rightActions):
 	while(len(leftActions) > len(rightActions)):
 		rightActions += still()
 	while(len(rightActions) > len(leftActions)):
 		leftActions += still()
-	return (rightActions,leftActions)
+	return (leftActions,rightActions)
 
 # During this phase, tuple order is: (CENTER, OUTSKIRTS)
 # 3 THEN 3
@@ -100,11 +95,11 @@ def scatterOnto(blockID,blockIDBelow):
 # During this phase, tuple order is: (OUTSKIRTS, CENTER)
 # 4 THEN 4
 def padStackBlock():
-	return [still(),still(),still()]	
+	return [still(),still(),still()]
 
 def stackBlock(moveID,destID):
 	if destID == None:
-		centerAction = moveToHome()
+		centerAction = moveToCenterStackLocation()
 	else:
 		centerAction = moveOverBlock(destID)
 	return [moveOverBlock(moveID),moveToBlock(moveID),closeGripper(),     still(),centerAction,openGripper()]
@@ -140,7 +135,7 @@ def oneArm(startI,endI,numBlocks):
 	
 		rightActions = []
 		for blockID in scatterOrder:
-			rightActions += scatterBlock(blockID,3)
+			rightActions += scatterBlock(blockID,0)
 			
 	# If final state is scatter, we're done!
 	if endI == SCATTERED:
@@ -156,7 +151,7 @@ def oneArm(startI,endI,numBlocks):
 		rightActions += stackBlock(blockID,prevID)
 		prevID = blockID
 	
-	return (rightActions)
+	return rightActions
 
 def twoArms(startI,endI,numBlocks):
 	
@@ -210,7 +205,7 @@ def twoArms(startI,endI,numBlocks):
 	
 	# If final state is scatter, we're done!
 	if endI > 2:
-		return (rightActions,leftActions)
+		return (leftActions,rightActions)
 		
 	# Stagger
 	leftActions += padStackBlock() # right goes first
@@ -234,13 +229,12 @@ def twoArms(startI,endI,numBlocks):
 	else:
 		leftActions += padStackBlock()
 			
-	return (rightActions,leftActions)
+	return (leftActions,rightActions)
 
 # FALLBACK
 
 # Uses one arm to finish operation
 def fallback(worldState):
-	print "falllllllback"
 	
 	# Scatter first
 	rightActions = []
@@ -255,9 +249,7 @@ def fallback(worldState):
 	# Now we have all stacks that need to be deconstructed
 	# Scatter these
 	for stack in tallStacks:
-		blockList = list(stack.blocks)
-		blockListReversed = blockList.reverse()
-		blocks = tuple(blockList)
+		blocks = stack.blocks.reverse()
 		for blockID in blocks:
 			rightActions += scatterBlock(blockID,0)
 	
@@ -275,10 +267,10 @@ def fallback(worldState):
 ##################################AI EASY########################################
 def detectConfig(worldState):
 	# Get stack height
-	maxStackHeight = 1
+	maxStackHeight = 0
 	for stack in worldState.grid.stacks:
-		if maxStackHeight < len(stack.blocks):
-			maxStackHeight = len(stack.blocks)
+		if maxStackHeight < len(stack):
+			maxStackHeight = len(stack)
 	
 	# Get number of blocks
 	numBlocks = 0
@@ -290,28 +282,26 @@ def detectConfig(worldState):
 	numStacks = len(worldState.grid.stacks)
 	
 	# Is first stack ascending?
-	isAscending = (worldState.grid.stacks[0].blocks == tuple(range(1,numBlocks+1)))
+	isAscending = (worldState.grid.stacks[0] == range(1,numBlocks+1))
 	desc = range(1,numBlocks+1)
 	desc.reverse()
-	isDescending = (worldState.grid.stacks[0].blocks == tuple(desc))
-
-	if maxStackHeight == 1:
+	isDescending = (worldState.grid.stacks[0] == desc)
+	
+	if maxStackHeight == 0:
 		return (SCATTERED,numBlocks)
-	elif numStacks == 1 and isAscending:
+	if numStacks == 1 and isAscending:
 		return (STACKED_ASCENDING,numBlocks)
 	if numStacks == 1 and isDescending:
 		return (STACKED_DESCENDING,numBlocks)
-	else:
-		return (MESSED_UP,numBlocks)
+	return (MESSED_UP,numBlocks)
 
-def runActions(dormantActionRight, dormantActionLeft):
-	(action1,target1,text1) = dormantActionRight
-	(action2,target2,text2) = dormantActionLeft
+def runActions(dormantActionLeft, dormantActionRight):
+	(action1,target1,text1) = dormantActionLeft
+	(action2,target2,text2) = dormantActionRight
    	rospy.wait_for_service('move_robot')
    	try:
    		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
-   		data =  move_robot_handle(action1, action2, target1, target2)
-   		return data.success
+   		return move_robot_handle(action1, target1, action2, target2)
    	except rospy.ServiceException, e:
    		print "Service call failed: %s"%e
 
@@ -320,62 +310,55 @@ def runActions(dormantActionRight, dormantActionLeft):
 # Usage: pass in world state, goal string from params, number of arms
 # ex: actionPackage = heyAIWhatsNext(worldState,"scattered",2)
 def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
-	(currentState,numBlocks) = detectConfig(worldState)
-	goalState = translateStateInfo(goalStateString)
+	currentState = detectConfig(worldState)
+	(goalState,numBlocks) = translateStateInfo(goalStateString)
 	
-	(rightActions,leftActions) = ([],[])
+	(leftActions,rightActions) = ([],[])
 	
 	# RECOVER WITH FALLBACK IF NEEDED
 	if currentState == MESSED_UP:
 		(lPlus,rPlus) = fallback(worldState)
 		leftActions += lPlus
 		rightActions += rPlus
+		currentState = SCATTERED
 	
 	# PAD TO START FRESH
-	(rightActions,leftActions) = padGeneral(rightActions,leftActions)
+	(leftActions,rightActions) = padGeneral(leftActions,rightActions)
 	
 	if numArmsToUse == 1:
-		(rPlus) = oneArm(currentState,goalState,numBlocks)
-		rightActions += rPlus
-		return (rightActions, 0)
-	
-	if numArmsToUse == 2:
-		(lPlus,rPlus) = twoArms(currentState,goalState,numBlocks)
+		(lPlus,rPlus) = oneArm(worldState,currentState,goalState,numBlocks)
 		leftActions += lPlus
 		rightActions += rPlus
+		currentState = goalState
+	
+	if numArmsToUse == 2:
+		(lPlus,rPlus) = twoArms(worldState,currentState,goalState,numBlocks)
+		leftActions += lPlus
+		rightActions += rPlus
+		currentState = goalState
 	
 	# DONE. RETURN ACTIONPACKAGE
-	return ((rightActions,0),(leftActions,0))
+	return ((leftActions,0),(rightActions,0))
 
 # Usage: pass in actionPackage to perform next action
 # ex: actionPackage,response = heyAIDoNext(actionPackage)
-def heyAIDoNext(actionPackage, numArmsToUse):
-	if numArmsToUse == 2:
-		((rightActions,r),(leftActions,l)) = actionPackage
-		
-		leftAction = leftActions[l]
-		rightAction = rightActions[r]
-		dataBack = runActions(rightAction,leftAction)
-		
-		l += 1
-		r += 1
-		
-		return (((rightActions,r),(leftActions,l)),dataBack)
-	else:
-		((rightActions,r)) = actionPackage
-		
-		rightAction = rightActions[r]
-		dataBack = runActions(rightAction, still())
-		
-		r += 1
-		
-		return ((rightActions,r),dataBack)	
+def heyAIDoNext(actionPackage):
+	((leftActions,l),(rightActions,r)) = actionPackage
+	
+	leftAction = leftActions[l]
+	rightAction = rightActions[r]
+	dataBack = runActions(leftAction,rightAction)
+	
+	l += 1
+	r += 1
+	
+	return (((leftActions,l),(rightActions,r)),dataBack)
 
 # Usage: call this function to alert AI that the previous action needs to be retried
 # Still need to call heyAIDoNext
 # ex: actionPackage = heyAIThatFailed(actionPackage)
 def heyAIThatFailed(actionPackage):
-	((rightActions,r),(leftActions,l)) = actionPackage
+	((leftActions,l),(rightActions,r)) = actionPackage
 	l -= 1
 	r -= 1
-	return (((rightActions,r),(leftActions,l)), False)
+	return (((leftActions,l),(rightActions,r)),dataBack)

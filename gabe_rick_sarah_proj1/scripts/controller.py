@@ -5,16 +5,12 @@ from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
 from std_msgs.msg import String
 
-import move_planner
+import ai
 
 #########################GLOBAL DATA###########################
 
 worldState = WorldState()
 goalState = ""
-stepNumber = 0
-totalSteps = 0
-finishedState = ""
-
 
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
@@ -24,6 +20,7 @@ def worldStateReceived(data):
 
 def commandReceived(data):
 	#Handles custom commands from terminal
+	global goalState
 	if data != goalState:
 		goalState = data
 		requestworldState()
@@ -49,11 +46,12 @@ def requestWorldState():
 	global worldState
 	try:
 		WorldStateRequest = rospy.ServiceProxy("get_state",WorldState_Request)
-		worldState = WorldStateRequest('Whirled steight pls')
+		StateResponse = WorldStateRequest('Whirled steight pls')
+		worldState = StateResponse.state
 	except rospy.ServiceException, e:
 		return None
 
-def startAnActionList(isFallback):
+def startAnActionList(worldState, goalState):
 	global stepNumber
 	global totalSteps
 	global finishedState
@@ -122,15 +120,34 @@ def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol
 	initNetwork()
 	requestWorldState()
 
-	global serviceCallList
-	global totalSteps
-	global stepNumber
+	global worldState
+	rospy.sleep(1)
 
 	if isOneArmSolution:
-		ServiceCallList = startAnActionList(False)
-	else:
-		ServiceCallList = startAnActionList(False)
+		((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
+		while (r < len(rightActions) - 1):
+			((rightActions,r), dataBack) = ai.heyAIDoNext((rightActions,r), 1)
+			rospy.sleep(1)
+			if dataBack == False:
+				print "oh no"
+				print rightActions[r]
+				print dataBack
+				((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
 
+	else:
+		((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
+
+		while (r < len(rightActions) - 1):
+			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
+			rospy.sleep(1)
+			if dataBack == False:
+				print "oh no"
+				print rightActions[l]
+				print dataBack
+				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
+		
+	rospy.sleep(1)		
+	print worldState
 	rospy.spin()
 
 if __name__ == '__main__':
@@ -143,6 +160,6 @@ if __name__ == '__main__':
 		blockLocaleRow = 3
 		blockLocaleCol = 3
 		configuration = "stacked_ascending"
-		goalState = "stacked_descending"
+		goalState = "sorted_odd_even"
 		isOneArmSolution = False
 	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
