@@ -259,11 +259,11 @@ def fallback(worldState):
 	
 #################################TESTING#########################################
 
-(l,r) = twoArms("stacked_ascending", "sorted_odd_even",5)
-for i in range(len(l)):
-	(_,_,left) = l[i]
-	(_,_,right) = r[i]
-	print(left + "\t" + right)
+#(l,r) = twoArms("stacked_ascending", "sorted_odd_even",5)
+#for i in range(len(l)):
+#	(_,_,left) = l[i]
+#	(_,_,right) = r[i]
+#	print(left + "\t" + right)
 	
 ##################################AI EASY########################################
 def detectConfig(worldState):
