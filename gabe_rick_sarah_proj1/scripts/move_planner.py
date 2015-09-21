@@ -1,9 +1,86 @@
 #!/usr/bin/env python
 
-#import action_handler
+#import rospy
+#from gabe_ricky_sarah_proj1.srv import*
+#from gabe_ricky_sarah_proj1.msg import*
+#from std_msgs.msg import String
+
+BLOCK_TARGET = 1 # Any positive number = blockID
+TABLE_TARGET = 0
+ABLE_LEFT_TARGET = -1
+TABLE_RIGHT_TARGET = -2
+HOME_TARGET = -3
+GRIPPER_TARGET = -4
+NO_TARGET = -5
+
+OPEN_OPERATION = 1
+CLOSE_OPERATION = 2
+MOVE_OVER_OPERATION = 3
+MOVE_TO_OPERATION = 4
+NO_OPERATION = 5
+
+##################################ACTION HANDLER########################################
+
+# SIMPLE ACTIONS
+def openGripper():
+	return createDormantAction(GRIPPER_TARGET,OPEN_OPERATION, "open gripper       ")
+
+
+def closeGripper():
+	return createDormantAction(GRIPPER_TARGET,CLOSE_OPERATION, "close gripper      ")
+
+def moveToBlock(blockID):
+	return createDormantAction(blockID, MOVE_TO_OPERATION, "move to block " + str(blockID) + "    ")
+
+def moveOverBlock(blockID):
+	return createDormantAction(blockID, MOVE_OVER_OPERATION, "move over block " + str(blockID) + "  ")
+
+def moveToHome():
+	return createDormantAction(HOME_TARGET, MOVE_OVER_OPERATION, "move to home       ")
+
+def moveAboveTable(area):
+	return createDormantAction(area*-1, MOVE_OVER_OPERATION, "move over table a " + str(area))
+
+def still():
+	return createDormantAction(NO_TARGET, NO_OPERATION, "still              ")
+
+def createDormantAction(target, operation):
+	createDormantAction(target,operation,"")
+	
+def createDormantAction(target, operation, text):
+	act = Action()
+	tar = Target()
+	if operation == OPEN_OPERATION: # Open
+		act.type = 2
+		tar.blockID = 1
+	if operation == CLOSE_OPERATION: # Close
+		act.type = 3
+		tar.blockID = 1
+	if operation == MOVE_OVER_OPERATION: # Move Over
+		act.type = 7
+		tar.blockID = target
+	if operation == MOVE_TO_OPERATION: # Move To
+		act.type = 5
+		tar.blockID = target
+	if operation == NO_OPERATION: # Still
+		act.type = 11
+		tar.blockID = 1
+		
+	return (act,target,text)
+
+##################################MOVE PLANNER########################################
+
+
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
+
+def padGeneral(leftActions,rightActions):
+	while(len(leftActions) > len(rightActions)):
+		rightActions += still()
+	while(len(rightActions) > len(leftActions)):
+		leftActions += still()
+	return (leftActions,rightActions)
 
 # During this phase, tuple order is: (CENTER, OUTSKIRTS)
 # 3 THEN 3
@@ -30,33 +107,31 @@ def stackBlock(moveID,destID):
 	
 
 # FULL ROUTINES
-def translateStateInfo(startIn, endIn):
-	startOut = 1
-	if startIn == "scattered":
-		startOut = 3
-	if startIn == "stacked_descending":
-		startOut = 2
-		
-	endOut = 1
-	if endIn == "scattered":
-		endOut = 3
-	if endIn == "stacked_descending":
-		endOut = 2
-	if endIn == "sorted_odd_even":
-		endOut = 4
-	return (startOut,endOut)
+SCATTERED = 3
+STACKED_ASCENDING = 1
+STACKED_DESCENDING = 2
+SORTED_ODD_EVEN = 4
+MESSED_UP = 5
+def translateStateInfo(param):
+	endOut = STACKED_ASCENDING
+	if param == "scattered":
+		endOut = SCATTERED
+	if param == "stacked_descending":
+		endOut = STACKED_DESCENDING
+	if param == "sorted_odd_even":
+		endOut = SORTED_ODD_EVEN
+	return endOut
 	
-def oneArm(startState,endState,numBlocks):
-	startI,endI = translateStateInfo(startState,endState) # 1=ascending, 2=descending
+def oneArm(startI,endI,numBlocks):
 	
 	# If already done, return
 	if startI == endI:
 		return []
 	
 	# Scatter blocks
-	if not startI == 3:
+	if not startI == SCATTERED:
 		scatterOrder = range(1,numBlocks+1)
-		if(startI == 1):
+		if(startI == STACKED_ASCENDING):
 			scatterOrder.reverse()
 	
 		rightActions = []
@@ -64,12 +139,12 @@ def oneArm(startState,endState,numBlocks):
 			rightActions += scatterBlock(blockID,0)
 			
 	# If final state is scatter, we're done!
-	if endI == 3:
+	if endI == SCATTERED:
 		return rightActions
 	
 	# Re-stack blocks
 	stackOrder = range(1,numBlocks+1)
-	if(endI == 2):
+	if(endI == STACKED_DESCENDING):
 		stackOrder.reverse()
 	
 	prevID = None
@@ -79,16 +154,15 @@ def oneArm(startState,endState,numBlocks):
 	
 	return rightActions
 
-def twoArms(startState,endState,numBlocks):
-	startI,endI = translateStateInfo(startState,endState) # 1=ascending, 2=descending
+def twoArms(startI,endI,numBlocks):
 	
 	# If already done, return
 	if startI == endI:
-		return []
+		return ([],[])
 	
 	# Scatter blocks
 	scatterOrder = range(1,numBlocks+1)
-	if(startI == 1):
+	if(startI == STACKED_ASCENDING):
 		scatterOrder.reverse()
 	
 	# Prepare for synchronization
@@ -102,43 +176,44 @@ def twoArms(startState,endState,numBlocks):
 	for blockID in scatterOrder:
 		if len(rightActions) < len(leftActions):
 			# Moving blockID to right side
-			if endI == 4:
+			if endI == SORTED_ODD_EVEN:
 				if rightBottomID == -1:
 					rightBottomID = blockID
 					rightActions += scatterBlock(blockID,2)
 				else:
 					rightActions += scatterOnto(blockID,rightBottomID)
+					rightBottomID = blockID
 			else:
 				rightActions += scatterBlock(blockID,2)
 			
 		else:
 			# Moving blockID to left side
-			if endI == 4:
+			if endI == SORTED_ODD_EVEN:
 				if leftBottomID == -1:
 					leftBottomID = blockID
 					leftActions += scatterBlock(blockID,1)
 				else:
 					leftActions += scatterOnto(blockID,leftBottomID)
+					leftBottomID = blockID
 			else:
 				leftActions += scatterBlock(blockID,1)
-			
-	
-	# If final state is scatter, we're done!
-	if endI == 3 or endI == 4:
-		return rightActions
 	
 	# Synchronize
 	if len(rightActions) > len(leftActions):
 		leftActions = leftActions + padScatterBlock()
 	else:
 		rightActions = rightActions + padScatterBlock()
+	
+	# If final state is scatter, we're done!
+	if endI > 2:
+		return (leftActions,rightActions)
 		
 	# Stagger
 	leftActions += padStackBlock() # right goes first
 	
 	# Re-stack blocks
 	stackOrder = range(1,numBlocks+1)
-	if(endI == 2):
+	if(endI == STACKED_DESCENDING):
 		stackOrder.reverse()
 	
 	prevID = None
@@ -160,8 +235,7 @@ def twoArms(startState,endState,numBlocks):
 # FALLBACK
 
 # Uses one arm to finish operation
-def fallback(worldState,finalState,numBlocks):
-	endState,_ = translateStateInfo(finalState,finalState)
+def fallback(worldState):
 	
 	# Scatter first
 	rightActions = []
@@ -180,34 +254,112 @@ def fallback(worldState,finalState,numBlocks):
 		for blockID in blocks:
 			rightActions += scatterBlock(blockID,0)
 	
-	# If final state is scatter, we're done
-	if endState == 3:
-		return rightActions
-	
-	# Re-stack blocks
-	stackOrder = range(1,numBlocks+1)
-	if(endState == 2):
-		stackOrder.reverse()
-	
-	prevID = None
-	for blockID in scatterOrder:
-		rightActions += stackBlock(blockID,prevID)
-		prevID = blockID
 	
 	return rightActions
-	# TODO: if block is already on center square, issue! Maybe add to scatter list later?
+	
+#################################TESTING#########################################
 
-# TESTS
+(l,r) = twoArms("stacked_ascending", "sorted_odd_even",5)
+for i in range(len(l)):
+	(_,_,left) = l[i]
+	(_,_,right) = r[i]
+	print(left + "\t" + right)
+	
+##################################AI EASY########################################
+def detectConfig(worldState):
+	# Get stack height
+	maxStackHeight = 0
+	for stack in worldState.grid.stacks:
+		if maxStackHeight < len(stack):
+			maxStackHeight = len(stack)
+	
+	# Get number of blocks
+	numBlocks = 0
+	for stack in worldState.grid.stacks:
+		for blockID in stack.blocks:
+			numBlocks += 1
+	
+	# Get number of stacks
+	numStacks = len(worldState.grid.stacks)
+	
+	# Is first stack ascending?
+	isAscending = (worldState.grid.stacks[0] == range(1,numBlocks+1))
+	desc = range(1,numBlocks+1)
+	desc.reverse()
+	isDescending = (worldState.grid.stacks[0] == desc)
+	
+	if maxStackHeight == 0:
+		return (SCATTERED,numBlocks)
+	if numStacks == 1 and isAscending:
+		return (STACKED_ASCENDING,numBlocks)
+	if numStacks == 1 and isDescending:
+		return (STACKED_DESCENDING,numBlocks)
+	return (MESSED_UP,numBlocks)
 
-#print ("\nOne arm solution:\n")
+def runActions(dormantActionLeft, dormantActionRight):
+	(action1,target1,text1) = dormantActionLeft
+	(action2,target2,text2) = dormantActionRight
+   	rospy.wait_for_service('move_robot')
+   	try:
+   		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
+   		return move_robot_handle(action1, target1, action2, target2)
+   	except rospy.ServiceException, e:
+   		print "Service call failed: %s"%e
 
-#for item in oneArm("stacked_ascending","scattered",0,0,3):
-#	print(item)
+##### USE THESE FUNCTIONS ONLY #####
 
-#print ("\n\nTwo arm solution:\n")
-#
-#(leftActions,rightActions) = twoArms("stacked_descending","stacked_ascending",0,0,4)
-#for i in range(len(leftActions)):
-#	left = leftActions[i]
-#	right = rightActions[i]
-#	print(left + "\t" + right)
+# Usage: pass in world state, goal string from params, number of arms
+# ex: actionPackage = heyAIWhatsNext(worldState,"scattered",2)
+def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
+	currentState = detectConfig(worldState)
+	(goalState,numBlocks) = translateStateInfo(goalStateString)
+	
+	(leftActions,rightActions) = ([],[])
+	
+	# RECOVER WITH FALLBACK IF NEEDED
+	if currentState == MESSED_UP:
+		(lPlus,rPlus) = fallback(worldState)
+		leftActions += lPlus
+		rightActions += rPlus
+		currentState = SCATTERED
+	
+	# PAD TO START FRESH
+	(leftActions,rightActions) = padGeneral(leftActions,rightActions)
+	
+	if numArmsToUse == 1:
+		(lPlus,rPlus) = oneArm(worldState,currentState,goalState,numBlocks)
+		leftActions += lPlus
+		rightActions += rPlus
+		currentState = goalState
+	
+	if numArmsToUse == 2:
+		(lPlus,rPlus) = twoArms(worldState,currentState,goalState,numBlocks)
+		leftActions += lPlus
+		rightActions += rPlus
+		currentState = goalState
+	
+	# DONE. RETURN ACTIONPACKAGE
+	return ((leftActions,0),(rightActions,0))
+
+# Usage: pass in actionPackage to perform next action
+# ex: actionPackage,response = heyAIDoNext(actionPackage)
+def heyAIDoNext(actionPackage):
+	((leftActions,l),(rightActions,r)) = actionPackage
+	
+	leftAction = leftActions[l]
+	rightAction = rightActions[r]
+	dataBack = runActions(leftAction,rightAction)
+	
+	l += 1
+	r += 1
+	
+	return (((leftActions,l),(rightActions,r)),dataBack)
+
+# Usage: call this function to alert AI that the previous action needs to be retried
+# Still need to call heyAIDoNext
+# ex: actionPackage = heyAIThatFailed(actionPackage)
+def heyAIThatFailed(actionPackage):
+	((leftActions,l),(rightActions,r)) = actionPackage
+	l -= 1
+	r -= 1
+	return (((leftActions,l),(rightActions,r)),dataBack)
