@@ -513,9 +513,9 @@ if __name__ == "__main__":
 			numBlocks = 3
 			blockLocaleRow = 3
 			blockLocaleCol = 3
-			configuration = "stacked_ascending"
-			goalState = "sorted_odd_even"
-			isOneArmSolution = False
+			configuration = "scattered"
+			goalState = "stacked_descending"
+			isOneArmSolution = True
 		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
 	except rospy.ROSInterruptException:
 		pass

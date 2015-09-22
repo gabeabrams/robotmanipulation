@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 
-#import rospy
-#from gabe_ricky_sarah_proj1.srv import*
-#from gabe_ricky_sarah_proj1.msg import*
-#from std_msgs.msg import String
-
 BLOCK_TARGET = 1 # Any positive number = blockID
 TABLE_TARGET = -3
 TABLE_LEFT_TARGET = -1
@@ -23,6 +18,7 @@ import rospy
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
 from std_msgs.msg import String
+import controller
 ##################################ACTION HANDLER########################################
 
 # SIMPLE ACTIONS
@@ -131,6 +127,9 @@ def oneArm(startI,endI,numBlocks):
 	# If already done, return
 	if startI == endI:
 		return []
+
+	rightActions = []
+	rightActions += [openGripper()]
 	
 	# Scatter blocks
 	if not startI == SCATTERED:
@@ -139,6 +138,7 @@ def oneArm(startI,endI,numBlocks):
 			scatterOrder.reverse()
 	
 		rightActions = []
+		rightActions += [(openGripper())]	
 		for blockID in scatterOrder:
 			rightActions += scatterBlock(blockID,3)
 			
@@ -152,7 +152,7 @@ def oneArm(startI,endI,numBlocks):
 		stackOrder.reverse()
 	
 	prevID = None
-	for blockID in scatterOrder:
+	for blockID in stackOrder:
 		rightActions += stackBlock(blockID,prevID)
 		prevID = blockID
 	
@@ -172,6 +172,9 @@ def twoArms(startI,endI,numBlocks):
 	# Prepare for synchronization
 	rightActions = []
 	leftActions = padScatterBlock()
+
+	rightActions += [openGripper()]
+	leftActions += [openGripper()]
 	
 	# Odd/Even Sorting
 	leftBottomID = -1
@@ -242,15 +245,20 @@ def twoArms(startI,endI,numBlocks):
 def fallback(worldState):
 	print "falllllllback"
 	
-	# Scatter first
+	# Open first
 	rightActions = []
-	
+	rightActions += [(openGripper())]
+
+	(homeRow, homeCol) = controller.getHomeLoc()
+
 	# Find all stacks
 	stacks = worldState.grid.stacks
 	tallStacks = []
 	for stack in stacks:
 		if len(stack.blocks) > 1:
 			tallStacks.append(stack)
+		elif stack.row == homeRow and stack.col == homeCol:
+			rightActions += scatterBlock(stack.blocks[0], 3)
 	
 	# Now we have all stacks that need to be deconstructed
 	# Scatter these
@@ -259,10 +267,9 @@ def fallback(worldState):
 		blockListReversed = blockList.reverse()
 		blocks = tuple(blockList)
 		for blockID in blocks:
-			rightActions += scatterBlock(blockID,0)
+			rightActions += scatterBlock(blockID,3)
 	
-	
-	return rightActions
+	return (rightActions)
 	
 #################################TESTING#########################################
 
@@ -276,9 +283,14 @@ def fallback(worldState):
 def detectConfig(worldState):
 	# Get stack height
 	maxStackHeight = 1
+	(homeRow, homeCol) = controller.getHomeLoc()
+	clogging = False
+
 	for stack in worldState.grid.stacks:
 		if maxStackHeight < len(stack.blocks):
 			maxStackHeight = len(stack.blocks)
+		if stack.row == homeRow and stack.col == homeCol:
+			clogging = True
 	
 	# Get number of blocks
 	numBlocks = 0
@@ -295,7 +307,7 @@ def detectConfig(worldState):
 	desc.reverse()
 	isDescending = (worldState.grid.stacks[0].blocks == tuple(desc))
 
-	if maxStackHeight == 1:
+	if maxStackHeight == 1 and clogging == False:
 		return (SCATTERED,numBlocks)
 	elif numStacks == 1 and isAscending:
 		return (STACKED_ASCENDING,numBlocks)
@@ -305,9 +317,10 @@ def detectConfig(worldState):
 		return (MESSED_UP,numBlocks)
 
 def runActions(dormantActionRight, dormantActionLeft):
+	print dormantActionRight
 	(action1,target1,text1) = dormantActionRight
 	(action2,target2,text2) = dormantActionLeft
-   	rospy.wait_for_service('move_robot')
+   	rospy.wait_for_service('move_robot', timeout=2)
    	try:
    		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
    		data =  move_robot_handle(action1, action2, target1, target2)
@@ -321,15 +334,17 @@ def runActions(dormantActionRight, dormantActionLeft):
 # ex: actionPackage = heyAIWhatsNext(worldState,"scattered",2)
 def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 	(currentState,numBlocks) = detectConfig(worldState)
+	print currentState
 	goalState = translateStateInfo(goalStateString)
+	print goalState
 	
 	(rightActions,leftActions) = ([],[])
 	
 	# RECOVER WITH FALLBACK IF NEEDED
 	if currentState == MESSED_UP:
-		(lPlus,rPlus) = fallback(worldState)
-		leftActions += lPlus
+		(rPlus) = fallback(worldState)
 		rightActions += rPlus
+		currentState = SCATTERED
 	
 	# PAD TO START FRESH
 	(rightActions,leftActions) = padGeneral(rightActions,leftActions)
@@ -361,15 +376,16 @@ def heyAIDoNext(actionPackage, numArmsToUse):
 		r += 1
 		
 		return (((rightActions,r),(leftActions,l)),dataBack)
+
 	else:
 		((rightActions,r)) = actionPackage
-		
+
 		rightAction = rightActions[r]
 		dataBack = runActions(rightAction, still())
 		
 		r += 1
 		
-		return ((rightActions,r),dataBack)	
+		return (r,dataBack)	
 
 # Usage: call this function to alert AI that the previous action needs to be retried
 # Still need to call heyAIDoNext

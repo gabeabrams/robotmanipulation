@@ -11,6 +11,11 @@ import ai
 
 worldState = WorldState()
 goalState = ""
+blockLocaleRow = None
+blockLocaleCol = None
+rightActions = []
+leftActions = []
+kill = False
 
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
@@ -22,22 +27,12 @@ def commandReceived(data):
 	#Handles custom commands from terminal
 	global goalState
 	if data != goalState:
-		goalState = data
-		requestworldState()
-		startAnActionList(True)
-
-def moveRobotRequest(req):
-	rospy.wait_for_service('move_robot')
-	try:
-		MakeMove = rospy.ServiceProxy("move_robot",MoveRobot)
-		robotMoved = MakeMove(req.rightArmAction, req.leftArmAction, req.rightArmTarget, req.leftArmTarget)
-		if robotMoved != True:
-			requestWorldState()
-			startAnActionList(True)
-		else:
-			stepNumber += 1
-	except rospy.ServiceException, e:
-		"Nothing happens"
+		global kill
+		goalState = data.data
+		requestWorldState()
+		kill = True
+		rospy.sleep(2)
+		MakeAIControlRobot()	
 
 def requestWorldState():
 	#Requests the world state from robot_interface
@@ -50,38 +45,6 @@ def requestWorldState():
 		worldState = StateResponse.state
 	except rospy.ServiceException, e:
 		return None
-
-def startAnActionList(worldState, goalState):
-	global stepNumber
-	global totalSteps
-	global finishedState
-
-	if isFallback:
-		if finishedState != "":
-			if isOneArmSolution:
-				ServiceCallList = move_planner.oneArm(finishedState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
-			else:
-				ServiceCallList = move_planner.twoArms(finishedState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)	
-		else:
-			ServiceCallList = move_planner.fallback(worldState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
-
-	else: 
-		if isOneArmSolution:
-			ServiceCallList = move_planner.oneArm(finishedState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
-		else:
-			ServiceCallList = move_planner.twoArms(finishedState, goalState, blockLocaleRow, blockLocaleCol, numBlocks)
-
-	stepNumber = 1
-	totalSteps = len(ServiceCallList)
-
-	while stepNumber <= totalSteps:
-		finishedState = ""
-		moveRobotRequest(ServiceCallList[stepNumber-1])
-		stepNumber += 1
-
-	if stepNumber == totalSteps:
-		finishedState = goalState			
-
 
 ######################INIT FUNCTIONS########################
 def initNetwork():
@@ -110,7 +73,48 @@ def readParams():
 	blockLocaleCol = rospy.get_param("blockLocaleCol")
 	configuration = rospy.get_param("configuration")
 	goalState = rospy.get_param("goalState")
-	isOneArmSolution = rospy.get_param("isOneArmSolution")	
+	isOneArmSolution = rospy.get_param("isOneArmSolution")
+
+def getHomeLoc():
+	global blockLocaleCol
+	global blockLocaleRow
+	return (blockLocaleRow, blockLocaleCol)	
+
+def MakeAIControlRobot():
+	global worldState
+	global goalState
+	rospy.sleep(1)
+	print goalState
+	global rightActions
+	global leftActions
+	global kill
+
+	rightActions = []
+	leftActions = []
+
+	if isOneArmSolution:
+		((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
+		while (r < len(rightActions) - 1) and kill == False:
+			print r
+			(r, dataBack) = ai.heyAIDoNext((rightActions,r), 1)
+			rospy.sleep(1)
+			if dataBack == False:
+				print "oh no"
+				((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
+		if kill == True:
+			kill = False	
+	else:
+		((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
+
+		while (r < len(rightActions) - 1):
+			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
+			rospy.sleep(1)
+			if dataBack == False:
+				print "oh no"
+				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
+		
+	rospy.sleep(1)		
+	print worldState		
 	
 def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSpolution):
 	# Create controller node
@@ -120,34 +124,8 @@ def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol
 	initNetwork()
 	requestWorldState()
 
-	global worldState
-	rospy.sleep(1)
+	MakeAIControlRobot()
 
-	if isOneArmSolution:
-		((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
-		while (r < len(rightActions) - 1):
-			((rightActions,r), dataBack) = ai.heyAIDoNext((rightActions,r), 1)
-			rospy.sleep(1)
-			if dataBack == False:
-				print "oh no"
-				print rightActions[r]
-				print dataBack
-				((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
-
-	else:
-		((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
-
-		while (r < len(rightActions) - 1):
-			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
-			rospy.sleep(1)
-			if dataBack == False:
-				print "oh no"
-				print rightActions[l]
-				print dataBack
-				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
-		
-	rospy.sleep(1)		
-	print worldState
 	rospy.spin()
 
 if __name__ == '__main__':
@@ -159,7 +137,7 @@ if __name__ == '__main__':
 		numBlocks = 3
 		blockLocaleRow = 3
 		blockLocaleCol = 3
-		configuration = "stacked_ascending"
-		goalState = "sorted_odd_even"
-		isOneArmSolution = False
+		configuration = "scattered"
+		goalState = "stacked_descending"
+		isOneArmSolution = True
 	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
