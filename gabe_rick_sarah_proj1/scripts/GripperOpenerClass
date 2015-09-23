@@ -1,0 +1,18 @@
+import argparse
+import sys
+import rospy
+from baxter_interface import (
+	Gripper
+)
+
+class GripperOpener(object):
+
+	def __init__(self, arm):
+		self._arm = arm
+		self._gripper = Gripper('%s' % (arm,))
+
+	def openAction(self):
+		self._gripper.open(self, block = False, timeout = 5)	
+
+	def closeAction(self):
+		self._gripper.command_position(self, 50, block = False, timeout = 5.0)

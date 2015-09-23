@@ -1,3 +1,5 @@
+import robot_interface
+
 x0 = 0
 y0 = 0
 z0 = 0
@@ -9,27 +11,38 @@ gridDepth = 0
 homeRow = 0
 homeCol = 0
 
-BLOCK_SIDE = 1.75 # WHAT UNITS ARE WE USING?
+BLOCK_SIDE = 1.75*.00254 # meters
 
 # Usage: initGridToCartesian((x,y,z),(homeRow,homeCol),(rows,cols),(width,height),numBlocks)
-def initGridToCartesian(baxterCoords,homeRowCol,tableRowCols, tableDimensions, numBlocks):
+def initGridToCartesian(baxterCoords, tableRowCols, tableDimensions):
 	(x,y,z) = baxterCoords
+
+	global homeRow
+	global homeCol
+	(homeRow, homeCol) = robot_interface.getHomeLoc()
+
+	global x0
+	global y0
+	global z0
 	x0 = x
 	y0 = y
-	z0 = z - numBlocks * BLOCK_SIDE
+	z0 = z - numBlocks + 1 * BLOCK_SIDE
 	
 	(rows,cols) = tableRowCols
-	(homeRowA,homeColA) = homeRowCol
-	homeRow = homeRowA
-	homeCol = homeColA
 	(width,height) = tableDimensions
 	
+	global gridWidth
+	global gridHeight
+	global gridDepth
 	gridWidth = width/cols
 	gridHeight = height/rows
-	
 	gridDepth = BLOCK_SIDE
 
 def toCartesian(row,col,height):
+	global gridWidth
+	global gridHeight
+	global gridDepth
+	
 	rowDiff = row-homeRow
 	colDiff = col-homeCol
 	
@@ -38,6 +51,6 @@ def toCartesian(row,col,height):
 	
 	x = x0 + xDiff
 	y = y0 + yDiff
-	z = height*gridDepth
+	z = (height-1)*gridDepth
 	
 	return (x,y,z)

@@ -4,6 +4,8 @@ import rospy
 import random
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
+from baxter_interface import Gripper
+from baxter_interface import Limb
 
 #########################GLOBAL DATA###########################
 
@@ -25,6 +27,8 @@ leftLastOver = 0;
 
 home = [0,0];
 
+ClosedPercent = 50;
+BLOCK_SIDE = 1.75*.00254
 #######################WORLD STATE FUNCTIONS########################
 
 def getWorldState():
@@ -137,6 +141,7 @@ def getBlockInfo(blockID):
 	row = 0
 	col = 0
 	depth = 0
+	height = 0
 
 	if blockID > 0:
 		for stack in worldState.grid.stacks:
@@ -144,6 +149,7 @@ def getBlockInfo(blockID):
 				row = stack.row
 				col = stack.col
 				depth = len(stack.blocks) - stack.blocks.index(blockID)
+				height = stack.blocks.index(blockID)
 				found = True
 
 	elif blockID == 0:	
@@ -152,12 +158,13 @@ def getBlockInfo(blockID):
 		for stack in worldState.grid.stacks:
 			if stack.row == row and stack.col == col:
 				newBlock = stack.blocks[-1]
-				(found, row, col, depth) = getBlockInfo(newBlock) 
+				(found, row, col, depth, height) = getBlockInfo(newBlock) 
 		found = True		
 
 	else:
 		(row,col) = getRandomTableLocation(blockID)
 		depth = 1
+		height = 0
 		found = True	
 
 	return (found,row,col,depth)
@@ -167,6 +174,15 @@ def getStackInWS(row,col):
 		if stack.row == row and stack.col == col:
 			return stack
 	return None
+
+def getHomeLoc():
+	global blockLocaleCol
+	global blockLocaleRow
+	return (blockLocaleRow, blockLocaleCol)	
+
+def getNumBlocks():
+	global numBlocks
+	return numBlocks	
 
 def getRandomTableLocation(blockID):
 	"Returns row and column of random open table location"
@@ -197,12 +213,13 @@ def getRandomTableLocation(blockID):
 
 	return (row,col)	
 
+######################MOVING FUNCTIONS########################
 def Mover(action, target, arm):
 
 	blockID = target.blockID
 
 	gripperIsOpen = getGripperIsOpen(arm)
-	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+	(blockFound, blockRow, blockCol, blockDepth, blockHeight) = getBlockInfo(blockID)
 
 	global rightLastTarget
 	global rightLastAction
@@ -237,7 +254,8 @@ def Mover(action, target, arm):
 			updateGripperState(True, arm)
 			if holding != None:				# Prevents errors from unnecessary opening
 				lastHeld = holding 			# Update last held block
-			holding = None 					# No longer holding block	
+			holding = None 	
+			baxterOpen(arm)					# No longer holding block	
 
 		elif action.type == action.CLOSE_GRIPPER:
 			updateGripperState(False, arm)
@@ -245,18 +263,21 @@ def Mover(action, target, arm):
 				holding = lastHeld
 			if lastAction == action.MOVE_TO_BLOCK:
 				holding = lastTarget
-			lastAction = action.CLOSE_GRIPPER	
+			lastAction = action.CLOSE_GRIPPER
+			baxterClose(arm)	
 
 		elif action.type == action.MOVE_TO_BLOCK:
 			lastAction = action.MOVE_TO_BLOCK
 			lastTarget = blockID
+			baxterMoveTo(arm)
 
 		elif action.type == action.MOVE_OVER_BLOCK:
 			lastAction = action.MOVE_OVER_BLOCK
 			if (holding != None):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
-			lastOver = blockID		
+			lastOver = blockID	
+			baxterMoveOver(arm, blockRow, blockCol, blockDepth)	
 	
 	else:
 		if action.type == action.MOVE_OVER_BLOCK:
@@ -264,7 +285,8 @@ def Mover(action, target, arm):
 			if (holding != None):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
-			lastOver = blockID				
+			lastOver = blockID	
+			baxterMoveOver(arm, blockRow, blockCol, blockDepth)			
 	
 	if arm == 'right':
 		rightHolding = holding
@@ -280,12 +302,50 @@ def Mover(action, target, arm):
 		leftLastTarget = lastTarget
 		leftLastOver = lastOver	
 
+def baxterOpen(arm):
+	if arm == 'right':
+		rightGripper.open(block = False, timeout = 5)
+	elif arm == 'left':
+		leftGripper.open(block = False, timeout = 5)		
+
+def baxterClose(arm):
+	global ClosedPercent
+	if arm == 'right':
+		rightGripper.command_position(ClosedPercent, block = False, timeout = 5)
+	elif arm == 'left':
+		leftGripper.command_position(ClosedPercent, block = False, timeout = 5)
+
+def baxterMoveTo(arm):
+	global BLOCK_SIDE
+	if arm == 'right':
+		currentPose = rightLimb.endpoint_pose()
+		currentx = currentPose.position.x
+		currenty = currentPose.position.y
+		currentz = currentPose.position.z
+		currento = currentPose.orientation
+		new z = currentz + BLOCK_SIDE   #TODO: is this the right direction??????
+
+		Request = pose_stamp()
+		Request.header = std_msgs/Header()
+		Request.header.seq = 0
+		Request.header.stamp = 
+		try:
+			#IK = rospy.ServiceProxy("get_state",WorldState_Request)
+			StateResponse = WorldStateRequest('Whirled steight pls')
+			worldState = StateResponse.state
+		except rospy.ServiceException, e:
+			return None
+
+def baxterMoveOver(arm, blockRow, blockCol, blockDepth):
+	print 1			
+
+######################CHECKING FUNCTIONS########################
 def oneArmChecker(action, target, arm):
 
 	blockID = target.blockID
 
 	gripperIsOpen = getGripperIsOpen(arm)
-	(blockFound, blockRow, blockCol, blockDepth) = getBlockInfo(blockID)
+	(blockFound, blockRow, blockCol, blockDepth, blockHeight) = getBlockInfo(blockID)
 
 	global rightLastTarget
 	global rightLastAction
@@ -351,8 +411,8 @@ def twoArmChecker(rightAction, rightTarget, leftAction, leftTarget):
 	rightGripperIsOpen = getGripperIsOpen('right')
 	leftGripperIsOpen = getGripperIsOpen('left')
 
-	(rightBlockFound, rightBlockRow, rightBlockCol, rightblockDepth) = getBlockInfo(rightBlockID)
-	(leftBlockFound, leftBlockRow, leftBlockCol, leftBlockDepth) = getBlockInfo(leftBlockID)	
+	(rightBlockFound, rightBlockRow, rightBlockCol, rightblockDepth, rightBlockHeight) = getBlockInfo(rightBlockID)
+	(leftBlockFound, leftBlockRow, leftBlockCol, leftBlockDepth, leftBlockHeight) = getBlockInfo(leftBlockID)	
 
 	global rightLastAction
 	global rightLastTarget
@@ -462,6 +522,17 @@ def initNetwork():
 	
 	return (moveRobotServer,getStateServer,worldStatePublisher,publishRate)
 
+def initBaxterObjects():
+	global rightGripper
+	global leftGripper
+	global rightLimb
+	global leftLimb
+
+	rightGripper = Gripper('right', versioned = False)
+	leftGripper = Gripper('left', versioned = False)
+	rightMover = Limb('right')
+	leftMover = Limb('left')
+
 def readParams():
 	# Reads ROS Parameters from launch file
 	global gridRows
@@ -495,6 +566,8 @@ def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocal
 
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
+
+	#initBaxterObjects()
 	
 	# Continually network
 	while not rospy.is_shutdown():
@@ -515,7 +588,7 @@ if __name__ == "__main__":
 			blockLocaleCol = 3
 			configuration = "scattered"
 			goalState = "stacked_descending"
-			isOneArmSolution = True
+			isOneArmSolution = False
 		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
 	except rospy.ROSInterruptException:
 		pass
@@ -540,37 +613,37 @@ def runTests():
 	stack = getStackInWS(5,5)
 	assert(stack == None)
 	
-	(found,row,col,depth) = getBlockInfo(1)
+	(found,row,col,depth, height) = getBlockInfo(1)
 	assert(found==True)
 	assert(row==0)
 	assert(col==0)
 	assert(depth==3)
 	
-	(found,row,col,depth) = getBlockInfo(2)
+	(found,row,col,depth, height) = getBlockInfo(2)
 	assert(found==True)
 	assert(row==0)
 	assert(col==0)
 	assert(depth==2)
 	
-	(found,row,col,depth) = getBlockInfo(3)
+	(found,row,col,depth, height) = getBlockInfo(3)
 	assert(found==True)
 	assert(row==0)
 	assert(col==0)
 	assert(depth==1)
 	
 	removeBlockFromWS(3)
-	(found,row,col,depth) = getBlockInfo(3)
+	(found,row,col,depth, height) = getBlockInfo(3)
 	assert(found==False)
 	
 	addBlockToWS(3,1,1)
-	(found,row,col,depth) = getBlockInfo(3)
+	(found,row,col,depth, height) = getBlockInfo(3)
 	assert(found)
 	assert(row==1)
 	assert(col==1)
 	assert(depth==1)
 	
 	moveBlockInWS(3,2,2)
-	(found,row,col,depth) = getBlockInfo(3)
+	(found,row,col,depth, height) = getBlockInfo(3)
 	assert(found)
 	assert(row==2)
 	assert(col==2)

@@ -320,7 +320,7 @@ def runActions(dormantActionRight, dormantActionLeft):
 	print dormantActionRight
 	(action1,target1,text1) = dormantActionRight
 	(action2,target2,text2) = dormantActionLeft
-   	rospy.wait_for_service('move_robot', timeout=2)
+   	rospy.wait_for_service('move_robot', timeout = 2)
    	try:
    		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
    		data =  move_robot_handle(action1, action2, target1, target2)

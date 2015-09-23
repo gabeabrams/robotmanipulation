@@ -37,7 +37,6 @@ def commandReceived(data):
 def requestWorldState():
 	#Requests the world state from robot_interface
 	rospy.wait_for_service('get_state')
-	global requestWorldState_Connection
 	global worldState
 	try:
 		WorldStateRequest = rospy.ServiceProxy("get_state",WorldState_Request)
@@ -88,6 +87,7 @@ def MakeAIControlRobot():
 	global rightActions
 	global leftActions
 	global kill
+	kill = False
 
 	rightActions = []
 	leftActions = []
@@ -139,5 +139,5 @@ if __name__ == '__main__':
 		blockLocaleCol = 3
 		configuration = "scattered"
 		goalState = "stacked_descending"
-		isOneArmSolution = True
+		isOneArmSolution = False
 	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
