@@ -36,7 +36,7 @@ def moveOverBlock(blockID):
 	return createDormantAction(blockID, MOVE_OVER_OPERATION, "move over block " + str(blockID) + "  ")
 
 def moveToHome():
-	return createDormantAction(HOME_TARGET, MOVE_OVER_OPERATION, "move to home       ")
+	return createDormantAction(HOME_TARGET, MOVE_OVER_OPERATION, "move over home       ")
 
 def moveAboveTable(area):
 	return createDormantAction(area*-1, MOVE_OVER_OPERATION, "move over table a " + str(area))
@@ -318,12 +318,14 @@ def detectConfig(worldState):
 
 def runActions(dormantActionRight, dormantActionLeft):
 	print dormantActionRight
+	print dormantActionLeft
 	(action1,target1,text1) = dormantActionRight
 	(action2,target2,text2) = dormantActionLeft
    	rospy.wait_for_service('move_robot', timeout = 2)
    	try:
    		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
-   		data =  move_robot_handle(action1, action2, target1, target2)
+   		data = move_robot_handle(action1, action2, target1, target2)
+   		print data
    		return data.success
    	except rospy.ServiceException, e:
    		print "Service call failed: %s"%e
@@ -352,7 +354,6 @@ def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 	if numArmsToUse == 1:
 		(rPlus) = oneArm(currentState,goalState,numBlocks)
 		rightActions += rPlus
-		return (rightActions, 0)
 	
 	if numArmsToUse == 2:
 		(lPlus,rPlus) = twoArms(currentState,goalState,numBlocks)
@@ -360,6 +361,7 @@ def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 		rightActions += rPlus
 	
 	# DONE. RETURN ACTIONPACKAGE
+	(rightActions,leftActions) = padGeneral(rightActions,leftActions)
 	return ((rightActions,0),(leftActions,0))
 
 # Usage: pass in actionPackage to perform next action
@@ -374,12 +376,10 @@ def heyAIDoNext(actionPackage, numArmsToUse):
 		
 		l += 1
 		r += 1
-		
 		return (((rightActions,r),(leftActions,l)),dataBack)
 
 	else:
-		((rightActions,r)) = actionPackage
-
+		((rightActions,r), (leftActions,l)) = actionPackage
 		rightAction = rightActions[r]
 		dataBack = runActions(rightAction, still())
 		

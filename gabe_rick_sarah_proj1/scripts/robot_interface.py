@@ -4,7 +4,19 @@ import rospy
 import random
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
-from baxter_common.baxter_core_msgs.srv import*
+from geometry_msgs.msg import (
+	PoseStamped,
+	Pose,
+	Point,
+	Quaternion,
+	)
+from std_msgs.msg import Header
+from baxter_core_msgs.srv import(
+	SolvePositionIK,
+	SolvePositionIKRequest,
+	)
+import gridToCartesian
+from baxter_core_msgs.srv import*
 from baxter_interface import Gripper
 from baxter_interface import Limb
 
@@ -185,9 +197,14 @@ def getStackInWS(row,col):
 	return None
 
 def getHomeLoc():
-	global blockLocaleCol
-	global blockLocaleRow
+	global home
+	blockLocaleRow = home[0]
+	blockLocaleCol = home[1]
 	return (blockLocaleRow, blockLocaleCol)	
+
+def getNumBlocks():
+	global numBlocks
+	return numBlocks
 
 def getNumBlocks():
 	global numBlocks
@@ -311,6 +328,8 @@ def Mover(action, target, arm):
 		leftLastTarget = lastTarget
 		leftLastOver = lastOver	
 
+	return 	
+
 def baxterOpen(arm):
 	global rightGripper
 	global leftGripper
@@ -389,19 +408,66 @@ def baxterIKRequest(X, Y, Z, arm):
 	global rightLimb
 	global leftLimb
 
-	Request = pose_stamp()
-	Request.header = std_msgs/Header()
-	Request.header.seq = 0
-	Request.header.stamp = now
-	Request.header.frame_id = 'base'
+	(xx, yy, zz, ww) = gridToCartesian.getBaxOrient()
 
-	Request.pose = geometry_msgs/Pose()
-	Request.
-		try:
-			IK = rospy.ServiceProxy()
-			
-		except rospy.ServiceException, e:
-			return None			
+	ns = "ExternalTools/" + arm + "/PositionKinematicsNode/IKService"
+
+	iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
+	ikreq = SolvePositionIKRequest()
+	hdr = Header(stamp = rospy.Time.now(), frame_id = 'base')
+
+	pose = {
+		'left': PoseStamped(
+			header = hdr,
+			pose = Pose(
+				position = Point(
+					x = X,
+					y = Y,
+					z = Z,
+				),
+				orientation = Quaternion(
+					x = xx,
+					y = yy,
+					z = zz,
+					w = ww,
+				),
+			),
+		),
+		'right': PoseStamped(
+			header = hdr,
+			pose = Pose(
+				position = Point(
+					x = X,
+					y = Y,
+					z = Z,
+				),
+				orientation = Quaternion(
+					x = xx,
+					y = yy,
+					z = zz,
+					w = ww,
+				),
+			),
+		),
+	}
+
+	ikreq.pose_stamp.append(pose[arm])
+
+	try:	
+		rospy.wait_for_service(ns, timeout = 5)
+		resp = iksvc(ikreq)
+
+		Names = resp.joints.name	
+		Positions = resp.joints.position
+		IKJoints = {}		
+		for i in range(len(Names)):
+			IKJoints[Names[i]] = Positions[i]
+		IKValid = resp.isValid
+		return(IKValid, IKJoints)	
+	except rospy.ServiceException, e:
+		print "IKService failed"
+		return(False, None)
+
 
 ######################CHECKING FUNCTIONS########################
 def oneArmChecker(action, target, arm):
@@ -552,6 +618,7 @@ def twoArmChecker(rightAction, rightTarget, leftAction, leftTarget):
 # Network listeners
 def moveRobotRequested(req):
 	"Handles requested move from controller. Returns True only if the move is valid. Executes action"
+	valid = False
 	
 	if isOneArmSolution:
 		valid = oneArmChecker(req.rightArmAction, req.rightArmTarget, 'right')
@@ -628,7 +695,7 @@ def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocal
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	gridToCartesian.initGridToCartesian()
+	gridToCartesian.initGridToCartesian((5,5),(.5,.5))
 	initBaxterObjects()
 
 	# Initialize network
@@ -651,7 +718,7 @@ if __name__ == "__main__":
 			numBlocks = 3
 			blockLocaleRow = 3
 			blockLocaleCol = 3
-			configuration = "scattered"
+			configuration = "stacked_ascending"
 			goalState = "stacked_descending"
 			isOneArmSolution = False
 		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)

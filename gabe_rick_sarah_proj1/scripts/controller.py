@@ -93,10 +93,10 @@ def MakeAIControlRobot():
 	leftActions = []
 
 	if isOneArmSolution:
-		((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
+		((rightActions,r),(leftActions, l)) = ai.heyAIWhatsNext(worldState, goalState, 1)
 		while (r < len(rightActions) - 1) and kill == False:
 			print r
-			(r, dataBack) = ai.heyAIDoNext((rightActions,r), 1)
+			(r, dataBack) = ai.heyAIDoNext(((rightActions,r), (leftActions, l)), 1)
 			rospy.sleep(1)
 			if dataBack == False:
 				print "oh no"
@@ -106,13 +106,14 @@ def MakeAIControlRobot():
 	else:
 		((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
 
-		while (r < len(rightActions) - 1):
+		while (r < len(rightActions) - 1) and kill == False:
 			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
 			rospy.sleep(1)
 			if dataBack == False:
 				print "oh no"
 				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
-		
+		if kill == True:
+			kill == False
 	rospy.sleep(1)		
 	print worldState		
 	
@@ -137,7 +138,7 @@ if __name__ == '__main__':
 		numBlocks = 3
 		blockLocaleRow = 3
 		blockLocaleCol = 3
-		configuration = "scattered"
+		configuration = "stacked_ascending"
 		goalState = "stacked_descending"
 		isOneArmSolution = False
 	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
