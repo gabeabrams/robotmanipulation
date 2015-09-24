@@ -11,22 +11,18 @@ gridDepth = 0
 homeRow = 0
 homeCol = 0
 
+BaxX0 = 0
+BaxY0 = 0
+BaxZ0 = 0
+BaxOrient = None
+
 BLOCK_SIDE = 1.75*.00254 # meters
 
-# Usage: initGridToCartesian((x,y,z),(homeRow,homeCol),(rows,cols),(width,height),numBlocks)
-def initGridToCartesian(baxterCoords, tableRowCols, tableDimensions):
-	(x,y,z) = baxterCoords
-
+# Usage: initGridToCartesian((x,y,z),(rows,cols),(width,height),numBlocks)
+def initGridToCartesian(tableRowCols, tableDimensions):
 	global homeRow
 	global homeCol
 	(homeRow, homeCol) = robot_interface.getHomeLoc()
-
-	global x0
-	global y0
-	global z0
-	x0 = x
-	y0 = y
-	z0 = z - numBlocks + 1 * BLOCK_SIDE
 	
 	(rows,cols) = tableRowCols
 	(width,height) = tableDimensions
@@ -52,5 +48,22 @@ def toCartesian(row,col,height):
 	x = x0 + xDiff
 	y = y0 + yDiff
 	z = (height-1)*gridDepth
-	
 	return (x,y,z)
+
+def initToBaxter(rightMover):
+	global BaxX0
+	global BaxY0
+	global BaxZ0
+	global BaxOrient
+
+	pose = rightMover.endpoint_pose()
+	BaxX0 = pose.position.x
+	BaxY0 = pose.position.y
+	BaxZ0 = pose.position.z - (numBlocks-1)*BLOCK_SIDE
+	BaxOrient = pose.orientation
+
+def toBaxter(x,y,z):
+	newx = y+Y0
+	newy = (-1*x)+Y0
+	newz = z+Z0
+	return (newx, newy, newz)

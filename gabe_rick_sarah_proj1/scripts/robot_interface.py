@@ -4,6 +4,7 @@ import rospy
 import random
 from gabe_ricky_sarah_proj1.srv import*
 from gabe_ricky_sarah_proj1.msg import*
+from baxter_common.baxter_core_msgs.srv import*
 from baxter_interface import Gripper
 from baxter_interface import Limb
 
@@ -26,9 +27,17 @@ leftLastTarget = None;
 leftLastOver = 0;
 
 home = [0,0];
+lastBaxterRightLoc = (0,0);
+lastBaxterLeftLoc = (0,0);
+
+leftGripper = None;
+rightGripper = None;
+leftLimb = None;
+rightLimb = None;
 
 ClosedPercent = 50;
-BLOCK_SIDE = 1.75*.00254
+BLOCK_SIDE = 1.75*.00254;
+numBlocks = 0;
 #######################WORLD STATE FUNCTIONS########################
 
 def getWorldState():
@@ -164,10 +173,10 @@ def getBlockInfo(blockID):
 	else:
 		(row,col) = getRandomTableLocation(blockID)
 		depth = 1
-		height = 0
+		height = -1
 		found = True	
 
-	return (found,row,col,depth)
+	return (found,row,col,depth, height)
 
 def getStackInWS(row,col):
 	for stack in worldState.grid.stacks:
@@ -269,7 +278,7 @@ def Mover(action, target, arm):
 		elif action.type == action.MOVE_TO_BLOCK:
 			lastAction = action.MOVE_TO_BLOCK
 			lastTarget = blockID
-			baxterMoveTo(arm)
+			baxterMoveTo(arm, blockRow, blockCol, blockHeight)
 
 		elif action.type == action.MOVE_OVER_BLOCK:
 			lastAction = action.MOVE_OVER_BLOCK
@@ -277,7 +286,7 @@ def Mover(action, target, arm):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
 			lastOver = blockID	
-			baxterMoveOver(arm, blockRow, blockCol, blockDepth)	
+			baxterMoveOver(arm, blockRow, blockCol, blockHeight)	
 	
 	else:
 		if action.type == action.MOVE_OVER_BLOCK:
@@ -303,6 +312,8 @@ def Mover(action, target, arm):
 		leftLastOver = lastOver	
 
 def baxterOpen(arm):
+	global rightGripper
+	global leftGripper
 	if arm == 'right':
 		rightGripper.open(block = False, timeout = 5)
 	elif arm == 'left':
@@ -310,34 +321,87 @@ def baxterOpen(arm):
 
 def baxterClose(arm):
 	global ClosedPercent
+	global leftGripper
+	global rightGripper
 	if arm == 'right':
 		rightGripper.command_position(ClosedPercent, block = False, timeout = 5)
 	elif arm == 'left':
 		leftGripper.command_position(ClosedPercent, block = False, timeout = 5)
 
-def baxterMoveTo(arm):
-	global BLOCK_SIDE
+def baxterMoveTo(arm, blockRow, blockCol, blockHeight):
+	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight)
+	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
+
+	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
+	if IKValid == True:
+		joints = IKJoints 
+		baxterMover(arm, joints)	
+
+def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
+	global numBlocks
+	global lastBaxterRightLoc
+	global lastBaxterLeftLoc
+	
 	if arm == 'right':
-		currentPose = rightLimb.endpoint_pose()
-		currentx = currentPose.position.x
-		currenty = currentPose.position.y
-		currentz = currentPose.position.z
-		currento = currentPose.orientation
-		new z = currentz + BLOCK_SIDE   #TODO: is this the right direction??????
+		(row, col) = lastBaxterRightLoc
+	else:
+		(row, col) = lastBaxterLeftLoc	
 
-		Request = pose_stamp()
-		Request.header = std_msgs/Header()
-		Request.header.seq = 0
-		Request.header.stamp = 
+	(x,y,z) = gridToCartesian.toCartesian(row, col, 2*numBlocks)
+	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
+	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
+	if IKValid == True:
+		joints = IKJoints 
+		baxterMover(arm, joints)
+
+	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, 2*numBlocks)	
+	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
+	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
+	if IKValid == True:
+		if arm == 'right':
+			lastBaxterRightLoc = (blockRow, blockCol)
+		else:
+			lastBaxterLeftLoc = (blockRow, blockCol)	
+		joints = IKJoints 
+		baxterMover(arm, joints)
+
+
+	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight+1)
+	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
+	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
+	if IKValid == True:
+		joints = IKJoints 
+		baxterMover(arm, joints)	
+
+def baxterMover(arm, Joints):
+	global rightLimb
+	global leftLimb
+	if arm == 'right':
+		rightLimb.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
+	else:
+		leftLimb.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
+			
+
+def baxterIKRequest(X, Y, Z, arm):
+	# TODO #
+	# Needs to return a joint set in the proper form for BaxterMover to access
+	# Also needs to return validity
+	global rightLimb
+	global leftLimb
+
+	Request = pose_stamp()
+	Request.header = std_msgs/Header()
+	Request.header.seq = 0
+	Request.header.stamp = now
+	Request.header.frame_id = 'base'
+
+	Request.pose = geometry_msgs/Pose()
+	Request.
 		try:
-			#IK = rospy.ServiceProxy("get_state",WorldState_Request)
-			StateResponse = WorldStateRequest('Whirled steight pls')
-			worldState = StateResponse.state
+			IK = rospy.ServiceProxy()
+			
 		except rospy.ServiceException, e:
-			return None
-
-def baxterMoveOver(arm, blockRow, blockCol, blockDepth):
-	print 1			
+			return None			
 
 ######################CHECKING FUNCTIONS########################
 def oneArmChecker(action, target, arm):
@@ -533,6 +597,8 @@ def initBaxterObjects():
 	rightMover = Limb('right')
 	leftMover = Limb('left')
 
+	gridToCartesian.initToBaxter(rightMover)
+
 def readParams():
 	# Reads ROS Parameters from launch file
 	global gridRows
@@ -562,12 +628,11 @@ def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocal
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	#runTests() # TODO: remove
+	gridToCartesian.initGridToCartesian()
+	initBaxterObjects()
 
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
-
-	#initBaxterObjects()
 	
 	# Continually network
 	while not rospy.is_shutdown():
