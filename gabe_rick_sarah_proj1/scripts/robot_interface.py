@@ -39,6 +39,8 @@ leftLastTarget = None;
 leftLastOver = 0;
 
 home = [0,0];
+gridRows = 0
+gridCols = 0
 lastBaxterRightLoc = (0,0);
 lastBaxterLeftLoc = (0,0);
 
@@ -171,7 +173,7 @@ def getBlockInfo(blockID):
 				col = stack.col
 				depth = len(stack.blocks) - stack.blocks.index(blockID)
 				height = stack.blocks.index(blockID)
-				found = True
+				found = True			
 
 	elif blockID == 0:	
 		(row,col) = home
@@ -180,6 +182,18 @@ def getBlockInfo(blockID):
 			if stack.row == row and stack.col == col:
 				newBlock = stack.blocks[-1]
 				(found, row, col, depth, height) = getBlockInfo(newBlock) 
+		found = True
+
+	elif blockID == -4:
+		(row, col) = (gridRows + 1, -1)	
+		depth = 1
+		height = 0
+		found = True
+
+	elif blockID == -5:
+		(row, col) = (-1, -1)
+		depth = 1
+		height = 0
 		found = True		
 
 	else:
@@ -188,7 +202,7 @@ def getBlockInfo(blockID):
 		height = -1
 		found = True	
 
-	return (found,row,col,depth, height)
+	return (found,row,col,depth,height)
 
 def getStackInWS(row,col):
 	for stack in worldState.grid.stacks:
@@ -222,14 +236,17 @@ def getRandomTableLocation(blockID):
 	
 	while not succeeded:
 		if blockID == -3:
+			taken = False
 			row = random.randint(0, worldState.grid.dimensions.row)
 			col = random.randint(0, worldState.grid.dimensions.col)
 		elif blockID == -1:	
-			row = random.randint(0, homerow)
-			col = random.randint(0, worldState.grid.dimensions.col)
+			taken = False
+			row = random.randint(0, worldState.grid.dimensions.row)
+			col = random.randint(0, homecol)
 		elif blockID == -2:	
-			row = random.randint(homerow, worldState.grid.dimensions.row)
-			col = random.randint(0, worldState.grid.dimensions.col)
+			taken = False
+			row = random.randint(0, worldState.grid.dimensions.row)
+			col = random.randint(homecol, worldState.grid.dimensions.col)
 		for stack in worldState.grid.stacks:
 			if row == stack.row and col == stack.col:
 				taken = True
@@ -281,7 +298,7 @@ def Mover(action, target, arm):
 			if holding != None:				# Prevents errors from unnecessary opening
 				lastHeld = holding 			# Update last held block
 			holding = None 	
-			baxterOpen(arm)					# No longer holding block	
+			#baxterOpen(arm)					# No longer holding block	
 
 		elif action.type == action.CLOSE_GRIPPER:
 			updateGripperState(False, arm)
@@ -290,12 +307,12 @@ def Mover(action, target, arm):
 			if lastAction == action.MOVE_TO_BLOCK:
 				holding = lastTarget
 			lastAction = action.CLOSE_GRIPPER
-			baxterClose(arm)	
+			#baxterClose(arm)	
 
 		elif action.type == action.MOVE_TO_BLOCK:
 			lastAction = action.MOVE_TO_BLOCK
 			lastTarget = blockID
-			baxterMoveTo(arm, blockRow, blockCol, blockHeight)
+			#baxterMoveTo(arm, blockRow, blockCol, blockHeight)
 
 		elif action.type == action.MOVE_OVER_BLOCK:
 			lastAction = action.MOVE_OVER_BLOCK
@@ -303,7 +320,7 @@ def Mover(action, target, arm):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
 			lastOver = blockID	
-			baxterMoveOver(arm, blockRow, blockCol, blockHeight)	
+			#baxterMoveOver(arm, blockRow, blockCol, blockHeight)	
 	
 	else:
 		if action.type == action.MOVE_OVER_BLOCK:
@@ -312,7 +329,7 @@ def Mover(action, target, arm):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
 			lastOver = blockID	
-			baxterMoveOver(arm, blockRow, blockCol, blockDepth)			
+			#baxterMoveOver(arm, blockRow, blockCol, blockDepth)			
 	
 	if arm == 'right':
 		rightHolding = holding
@@ -687,16 +704,21 @@ def readParams():
 	isOneArmSolution = rospy.get_param("isOneArmSolution")	
 
 # Full setup
-def initRobotInterface(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSolution):
+def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSolution):
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
+
+	global gridRows
+	global gridCols
+	gridRows = Rows
+	gridCols = Cols
 	
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
 	gridToCartesian.initGridToCartesian((5,5),(.5,.5))
-	initBaxterObjects()
+	#initBaxterObjects()
 
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
@@ -715,7 +737,7 @@ if __name__ == "__main__":
 		if ParamsBeingRead == 0:
 			gridRows = 5
 			gridCols = 5
-			numBlocks = 3
+			numBlocks = 4
 			blockLocaleRow = 3
 			blockLocaleCol = 3
 			configuration = "stacked_ascending"

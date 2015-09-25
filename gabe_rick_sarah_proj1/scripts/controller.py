@@ -11,12 +11,11 @@ import ai
 
 worldState = WorldState()
 goalState = ""
-blockLocaleRow = None
-blockLocaleCol = None
-rightActions = []
-leftActions = []
-kill = False
 
+blockLocaleRow = 0
+blockLocaleCol = 0
+
+kill = False
 ######################NETWORKING FUNCTS########################
 def worldStateReceived(data):
 	#Receives the world state from robot_interface
@@ -74,20 +73,15 @@ def readParams():
 	goalState = rospy.get_param("goalState")
 	isOneArmSolution = rospy.get_param("isOneArmSolution")
 
-def getHomeLoc():
-	global blockLocaleCol
-	global blockLocaleRow
-	return (blockLocaleRow, blockLocaleCol)	
-
 def MakeAIControlRobot():
 	global worldState
 	global goalState
-	rospy.sleep(1)
-	print goalState
 	global rightActions
 	global leftActions
 	global kill
 	kill = False
+
+	print ""
 
 	rightActions = []
 	leftActions = []
@@ -95,7 +89,6 @@ def MakeAIControlRobot():
 	if isOneArmSolution:
 		((rightActions,r),(leftActions, l)) = ai.heyAIWhatsNext(worldState, goalState, 1)
 		while (r < len(rightActions) - 1) and kill == False:
-			print r
 			(r, dataBack) = ai.heyAIDoNext(((rightActions,r), (leftActions, l)), 1)
 			rospy.sleep(1)
 			if dataBack == False:
@@ -108,22 +101,31 @@ def MakeAIControlRobot():
 
 		while (r < len(rightActions) - 1) and kill == False:
 			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
-			rospy.sleep(1)
+			rospy.sleep(3)
 			if dataBack == False:
 				print "oh no"
 				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
 		if kill == True:
 			kill == False
-	rospy.sleep(1)		
-	print worldState		
+	rospy.sleep(1)	
 	
-def initController(gridRows, gridCols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSpolution):
+	print "Starting from:"
+	print worldState	
+	print ""	
+	
+def initController(gridRows, gridCols, numBlocks, localeRow, localeCol, configuration, goalState, isOneArmSpolution):
 	# Create controller node
 	rospy.init_node("controller")
-	
+
+	global blockLocaleRow
+	global blockLocaleCol
+	blockLocaleRow = localeRow
+	blockLocaleCol = localeCol
+
 	# Create the network
 	initNetwork()
 	requestWorldState()
+	ai.sendHomeLoc(blockLocaleRow, blockLocaleCol)
 
 	MakeAIControlRobot()
 
@@ -135,7 +137,7 @@ if __name__ == '__main__':
 	if ParamsBeingRead == 0:
 		gridRows = 5
 		gridCols = 5
-		numBlocks = 3
+		numBlocks = 4
 		blockLocaleRow = 3
 		blockLocaleCol = 3
 		configuration = "stacked_ascending"

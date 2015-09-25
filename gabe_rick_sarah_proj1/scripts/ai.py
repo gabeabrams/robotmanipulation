@@ -13,6 +13,10 @@ CLOSE_OPERATION = 2
 MOVE_OVER_OPERATION = 3
 MOVE_TO_OPERATION = 4
 NO_OPERATION = 5
+MOVE_OUT_OPERATION = 6
+
+homeRow = 0
+homeCol = 0
 
 import rospy
 from gabe_ricky_sarah_proj1.srv import*
@@ -24,7 +28,6 @@ import controller
 # SIMPLE ACTIONS
 def openGripper():
 	return createDormantAction(GRIPPER_TARGET,OPEN_OPERATION, "open gripper       ")
-
 
 def closeGripper():
 	return createDormantAction(GRIPPER_TARGET,CLOSE_OPERATION, "close gripper      ")
@@ -40,6 +43,9 @@ def moveToHome():
 
 def moveAboveTable(area):
 	return createDormantAction(area*-1, MOVE_OVER_OPERATION, "move over table a " + str(area))
+
+def moveOut(side):
+	return createDormantAction(side, MOVE_OUT_OPERATION, "move out of the way   ")
 
 def still():
 	return createDormantAction(NO_TARGET, NO_OPERATION, "still              ")
@@ -65,22 +71,25 @@ def createDormantAction(target, operation, text):
 	if operation == NO_OPERATION: # Still
 		act.type = 11
 		tar.blockID = 1
+	if operation == MOVE_OUT_OPERATION:
+		act.type = 7
+		tar.blockID = target	
 
-	return (act,tar,text)
+	return (act, tar, text)
 
 ##################################MOVE PLANNER########################################
-
-
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
 
 def padGeneral(rightActions,leftActions):
-	while(len(leftActions) > len(rightActions)):
-		rightActions += still()
-	while(len(rightActions) > len(leftActions)):
-		leftActions += still()
-	return (rightActions,leftActions)
+	rPlus = [] 
+	lPlus = []
+	while((len(leftActions)+len(lPlus)) > (len(rPlus) + len(rightActions))):
+		rPlus += [still()]
+	while((len(rPlus) + len(rightActions)) > (len(lPlus) + len(leftActions))):
+		lPlus += [still()]
+	return (rPlus,lPlus)
 
 # During this phase, tuple order is: (CENTER, OUTSKIRTS)
 # 3 THEN 3
@@ -88,7 +97,7 @@ def padScatterBlock():
 	return [still(),still(),still(),still()]
 	
 def scatterBlock(blockID,area):
-	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(area),openGripper(),still(),still()]
+	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(area),openGripper(), still(),still()]
 	
 def scatterOnto(blockID,blockIDBelow):
 	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveOverBlock(blockIDBelow),openGripper(),still(),still()]
@@ -168,10 +177,16 @@ def twoArms(startI,endI,numBlocks):
 	scatterOrder = range(1,numBlocks+1)
 	if(startI == STACKED_ASCENDING):
 		scatterOrder.reverse()
+	if (startI == SCATTERED):
+		scatterOrder = []	
 	
 	# Prepare for synchronization
-	rightActions = []
-	leftActions = padScatterBlock()
+	if numBlocks%2 == 0:
+		leftActions = []
+		rightActions = padScatterBlock()
+	else:	
+		rightActions = []
+		leftActions = padScatterBlock()
 
 	rightActions += [openGripper()]
 	leftActions += [openGripper()]
@@ -224,7 +239,7 @@ def twoArms(startI,endI,numBlocks):
 		stackOrder.reverse()
 	
 	prevID = None
-	for blockID in scatterOrder:
+	for blockID in stackOrder:
 		if len(rightActions) < len(leftActions):
 			rightActions += stackBlock(blockID,prevID)
 		else:
@@ -233,8 +248,10 @@ def twoArms(startI,endI,numBlocks):
 	
 	# Synchronize arms
 	if len(rightActions) < len(leftActions):
+		rightActions += [moveOut(-4)]
 		rightActions += padStackBlock()
 	else:
+		leftActions += [moveOut(-5)]
 		leftActions += padStackBlock()
 			
 	return (rightActions,leftActions)
@@ -242,23 +259,25 @@ def twoArms(startI,endI,numBlocks):
 # FALLBACK
 
 # Uses one arm to finish operation
-def fallback(worldState):
-	print "falllllllback"
+def fallback(worldState, numArmsToUse):
+	print "Fallback activated."
 	
 	# Open first
 	rightActions = []
 	rightActions += [(openGripper())]
 
-	(homeRow, homeCol) = controller.getHomeLoc()
+	global homeRow
+	global homeCol	
 
 	# Find all stacks
 	stacks = worldState.grid.stacks
 	tallStacks = []
+	shortStacks = []
 	for stack in stacks:
 		if len(stack.blocks) > 1:
 			tallStacks.append(stack)
-		elif stack.row == homeRow and stack.col == homeCol:
-			rightActions += scatterBlock(stack.blocks[0], 3)
+		else:
+			shortStacks.append(stack)
 	
 	# Now we have all stacks that need to be deconstructed
 	# Scatter these
@@ -267,7 +286,17 @@ def fallback(worldState):
 		blockListReversed = blockList.reverse()
 		blocks = tuple(blockList)
 		for blockID in blocks:
-			rightActions += scatterBlock(blockID,3)
+			if (blockID%2) == 0:
+				rightActions += scatterBlock(blockID,2)
+			else:
+				rightActions += scatterBlock(blockID,1)	
+
+	for stack in shortStacks:
+		blockID = stack.blocks[0]
+		if blockID%2 == 0:
+			rightActions += scatterBlock(blockID, 1)
+		else:
+			rightActions += scatterBlock(blockID, 2)				
 	
 	return (rightActions)
 	
@@ -280,10 +309,17 @@ def fallback(worldState):
 #	print(left + "\t" + right)
 	
 ##################################AI EASY########################################
+def sendHomeLoc(blockLocaleRow, blockLocaleCol):
+	global homeRow
+	global homeCol
+	homeRow = blockLocaleRow
+	homeCol = blockLocaleCol
+
 def detectConfig(worldState):
 	# Get stack height
 	maxStackHeight = 1
-	(homeRow, homeCol) = controller.getHomeLoc()
+	global homeRow
+	global homeCol
 	clogging = False
 
 	for stack in worldState.grid.stacks:
@@ -317,7 +353,9 @@ def detectConfig(worldState):
 		return (MESSED_UP,numBlocks)
 
 def runActions(dormantActionRight, dormantActionLeft):
+	print "Right arm action: " 
 	print dormantActionRight
+	print "Left arm action:  " 
 	print dormantActionLeft
 	(action1,target1,text1) = dormantActionRight
 	(action2,target2,text2) = dormantActionLeft
@@ -326,6 +364,7 @@ def runActions(dormantActionRight, dormantActionLeft):
    		move_robot_handle = rospy.ServiceProxy('move_robot', MoveRobot)
    		data = move_robot_handle(action1, action2, target1, target2)
    		print data
+   		print ""
    		return data.success
    	except rospy.ServiceException, e:
    		print "Service call failed: %s"%e
@@ -335,33 +374,38 @@ def runActions(dormantActionRight, dormantActionLeft):
 # Usage: pass in world state, goal string from params, number of arms
 # ex: actionPackage = heyAIWhatsNext(worldState,"scattered",2)
 def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
-	(currentState,numBlocks) = detectConfig(worldState)
-	print currentState
+	(currentState, numBlocks) = detectConfig(worldState)
 	goalState = translateStateInfo(goalStateString)
-	print goalState
 	
 	(rightActions,leftActions) = ([],[])
 	
 	# RECOVER WITH FALLBACK IF NEEDED
 	if currentState == MESSED_UP:
-		(rPlus) = fallback(worldState)
+		(rPlus) = fallback(worldState, numArmsToUse)
 		rightActions += rPlus
+		leftActions += [openGripper()]
+		leftActions += [moveOut(-5)]
 		currentState = SCATTERED
 	
 	# PAD TO START FRESH
-	(rightActions,leftActions) = padGeneral(rightActions,leftActions)
-	
+	(rPlus, lPlus) = padGeneral(rightActions,leftActions)
+	rightActions += rPlus
+	leftActions += lPlus
+
 	if numArmsToUse == 1:
 		(rPlus) = oneArm(currentState,goalState,numBlocks)
 		rightActions += rPlus
 	
 	if numArmsToUse == 2:
-		(lPlus,rPlus) = twoArms(currentState,goalState,numBlocks)
+		(rPlus,lPlus) = twoArms(currentState,goalState,numBlocks)
 		leftActions += lPlus
 		rightActions += rPlus
 	
-	# DONE. RETURN ACTIONPACKAGE
-	(rightActions,leftActions) = padGeneral(rightActions,leftActions)
+	# DONE. RETURN ACTIONPsACKAGE
+	(rPlus,lPlus) = padGeneral(rightActions,leftActions)
+	leftActions += lPlus
+	rightActions += rPlus
+
 	return ((rightActions,0),(leftActions,0))
 
 # Usage: pass in actionPackage to perform next action
