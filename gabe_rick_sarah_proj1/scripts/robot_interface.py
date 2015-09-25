@@ -46,11 +46,11 @@ lastBaxterLeftLoc = (0,0);
 
 leftGripper = None;
 rightGripper = None;
-leftLimb = None;
-rightLimb = None;
+leftMover = None;
+rightMover = None;
 
-ClosedPercent = 50;
-BLOCK_SIDE = 1.75*.00254;
+ClosedPercent = 10;
+BLOCK_SIDE = 1.75*.0254;
 numBlocks = 0;
 #######################WORLD STATE FUNCTIONS########################
 
@@ -178,6 +178,7 @@ def getBlockInfo(blockID):
 	elif blockID == 0:	
 		(row,col) = home
 		depth = 1
+		height = -1
 		for stack in worldState.grid.stacks:
 			if stack.row == row and stack.col == col:
 				newBlock = stack.blocks[-1]
@@ -185,15 +186,15 @@ def getBlockInfo(blockID):
 		found = True
 
 	elif blockID == -4:
-		(row, col) = (gridRows + 1, -1)	
+		(row, col) = (1, gridCols+1)	
 		depth = 1
-		height = 0
+		height = -1
 		found = True
 
 	elif blockID == -5:
-		(row, col) = (-1, -1)
+		(row, col) = (1, 0)
 		depth = 1
-		height = 0
+		height = -1
 		found = True		
 
 	else:
@@ -237,16 +238,16 @@ def getRandomTableLocation(blockID):
 	while not succeeded:
 		if blockID == -3:
 			taken = False
-			row = random.randint(0, worldState.grid.dimensions.row)
-			col = random.randint(0, worldState.grid.dimensions.col)
+			row = random.randint(1, worldState.grid.dimensions.row)
+			col = random.randint(1, worldState.grid.dimensions.col)
 		elif blockID == -1:	
 			taken = False
-			row = random.randint(0, worldState.grid.dimensions.row)
-			col = random.randint(0, homecol)
+			row = random.randint(1, worldState.grid.dimensions.row)
+			col = random.randint(1, homecol-1)
 		elif blockID == -2:	
 			taken = False
-			row = random.randint(0, worldState.grid.dimensions.row)
-			col = random.randint(homecol, worldState.grid.dimensions.col)
+			row = random.randint(1, worldState.grid.dimensions.row)
+			col = random.randint(homecol+1, worldState.grid.dimensions.col)
 		for stack in worldState.grid.stacks:
 			if row == stack.row and col == stack.col:
 				taken = True
@@ -298,7 +299,7 @@ def Mover(action, target, arm):
 			if holding != None:				# Prevents errors from unnecessary opening
 				lastHeld = holding 			# Update last held block
 			holding = None 	
-			#baxterOpen(arm)					# No longer holding block	
+			baxterOpen(arm)					# No longer holding block	
 
 		elif action.type == action.CLOSE_GRIPPER:
 			updateGripperState(False, arm)
@@ -307,12 +308,12 @@ def Mover(action, target, arm):
 			if lastAction == action.MOVE_TO_BLOCK:
 				holding = lastTarget
 			lastAction = action.CLOSE_GRIPPER
-			#baxterClose(arm)	
+			baxterClose(arm)	
 
 		elif action.type == action.MOVE_TO_BLOCK:
 			lastAction = action.MOVE_TO_BLOCK
 			lastTarget = blockID
-			#baxterMoveTo(arm, blockRow, blockCol, blockHeight)
+			baxterMoveTo(arm, blockRow, blockCol, blockHeight)
 
 		elif action.type == action.MOVE_OVER_BLOCK:
 			lastAction = action.MOVE_OVER_BLOCK
@@ -320,7 +321,7 @@ def Mover(action, target, arm):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
 			lastOver = blockID	
-			#baxterMoveOver(arm, blockRow, blockCol, blockHeight)	
+			baxterMoveOver(arm, blockRow, blockCol, blockHeight)	
 	
 	else:
 		if action.type == action.MOVE_OVER_BLOCK:
@@ -329,7 +330,7 @@ def Mover(action, target, arm):
 				removeBlockFromWS(holding)
 				addBlockToWS(holding, blockRow, blockCol)
 			lastOver = blockID	
-			#baxterMoveOver(arm, blockRow, blockCol, blockDepth)			
+			baxterMoveOver(arm, blockRow, blockCol, blockHeight)			
 	
 	if arm == 'right':
 		rightHolding = holding
@@ -369,9 +370,11 @@ def baxterMoveTo(arm, blockRow, blockCol, blockHeight):
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
 
 	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
-	if IKValid == True:
+	if IKValid[0] == True:
 		joints = IKJoints 
 		baxterMover(arm, joints)	
+	else:
+		print "AHHHHHHHHH"	
 
 def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 	global numBlocks
@@ -383,47 +386,56 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 	else:
 		(row, col) = lastBaxterLeftLoc	
 
-	(x,y,z) = gridToCartesian.toCartesian(row, col, 2*numBlocks)
+	(x,y,z) = gridToCartesian.toCartesian(row, col, numBlocks+1)
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
 	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
-	if IKValid == True:
+	if IKValid[0] == True:
 		joints = IKJoints 
 		baxterMover(arm, joints)
+	else:
+		print "AHHHHHHHHH"		
 
-	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, 2*numBlocks)	
+	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, numBlocks+1)	
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
 	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
-	if IKValid == True:
+	if IKValid[0] == True:
 		if arm == 'right':
 			lastBaxterRightLoc = (blockRow, blockCol)
 		else:
 			lastBaxterLeftLoc = (blockRow, blockCol)	
 		joints = IKJoints 
 		baxterMover(arm, joints)
+	else:
+		print "AHHHHHHHHH"		
 
 
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight+1)
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
 	(IKValid, IKJoints) = baxterIKRequest(BaxX, BaxY, BaxZ, arm)
-	if IKValid == True:
+	if IKValid[0] == True:
 		joints = IKJoints 
 		baxterMover(arm, joints)	
+	else:
+		print "AHHHHHHHHH"		
+
+	return	
 
 def baxterMover(arm, Joints):
-	global rightLimb
-	global leftLimb
+	global rightMover
+	global leftMover
 	if arm == 'right':
-		rightLimb.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
+		rightMover.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
 	else:
-		leftLimb.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
-			
+		leftMover.move_to_joint_positions(Joints, timeout = 15, threshold = .01)
+	return		
 
 def baxterIKRequest(X, Y, Z, arm):
-	# TODO #
-	# Needs to return a joint set in the proper form for BaxterMover to access
-	# Also needs to return validity
-	global rightLimb
-	global leftLimb
+	print "Requesting"
+	print X
+	print Y
+	print Z
+	global rightMover
+	global leftMover
 
 	(xx, yy, zz, ww) = gridToCartesian.getBaxOrient()
 
@@ -474,8 +486,8 @@ def baxterIKRequest(X, Y, Z, arm):
 		rospy.wait_for_service(ns, timeout = 5)
 		resp = iksvc(ikreq)
 
-		Names = resp.joints.name	
-		Positions = resp.joints.position
+		Names = resp.joints[0].name	
+		Positions = resp.joints[0].position
 		IKJoints = {}		
 		for i in range(len(Names)):
 			IKJoints[Names[i]] = Positions[i]
@@ -673,8 +685,8 @@ def initNetwork():
 def initBaxterObjects():
 	global rightGripper
 	global leftGripper
-	global rightLimb
-	global leftLimb
+	global rightMover
+	global leftMover
 
 	rightGripper = Gripper('right', versioned = False)
 	leftGripper = Gripper('left', versioned = False)
@@ -713,12 +725,18 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 	global gridCols
 	gridRows = Rows
 	gridCols = Cols
+
+	global lastBaxterRightLoc
+	lastBaxterRightLoc = (blockLocaleRow, blockLocaleCol)
+
+	global home
+	home = (blockLocaleRow, blockLocaleCol)
 	
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	gridToCartesian.initGridToCartesian((5,5),(.5,.5))
-	#initBaxterObjects()
+	gridToCartesian.initGridToCartesian((2,2),(1,.5),numBlocks,(blockLocaleRow, blockLocaleCol)) #meters
+	initBaxterObjects()
 
 	# Initialize network
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
@@ -735,11 +753,11 @@ if __name__ == "__main__":
 		ParamsBeingRead = 0
 		#readParams(); ParamsBeingRead = 1
 		if ParamsBeingRead == 0:
-			gridRows = 5
-			gridCols = 5
-			numBlocks = 4
-			blockLocaleRow = 3
-			blockLocaleCol = 3
+			gridRows = 3
+			gridCols = 3
+			numBlocks = 3
+			blockLocaleRow = 2
+			blockLocaleCol = 2
 			configuration = "stacked_ascending"
 			goalState = "stacked_descending"
 			isOneArmSolution = False

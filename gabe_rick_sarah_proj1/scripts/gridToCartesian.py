@@ -1,24 +1,25 @@
-import robot_interface
-
 gridWidth = 0
 gridHeight = 0
 gridDepth = 0
 
 homeRow = 0
 homeCol = 0
+numBlocks = 0
 
 BaxX0 = 0
 BaxY0 = 0
 BaxZ0 = 0
 BaxOrient = None
 
-BLOCK_SIDE = 1.75*.00254 # meters
+BLOCK_SIDE = 1.75*.0254 # meters
 
 # Usage: initGridToCartesian((x,y,z),(rows,cols),(width,height),numBlocks)
-def initGridToCartesian(tableRowCols, tableDimensions):
+def initGridToCartesian(tableRowCols, tableDimensions, numB, home):
 	global homeRow
 	global homeCol
-	(homeRow, homeCol) = robot_interface.getHomeLoc()
+	global numBlocks
+	(homeRow, homeCol) = home
+	numBlocks = numB
 	
 	(rows,cols) = tableRowCols
 	(width,height) = tableDimensions
@@ -41,7 +42,7 @@ def toCartesian(row,col,height):
 	x = colDiff*gridWidth
 	y = rowDiff*gridHeight
 	
-	z = (height-1)*gridDepth
+	z = (height)*gridDepth
 	return (x,y,z)
 
 def initToBaxter(rightMover):
@@ -49,8 +50,7 @@ def initToBaxter(rightMover):
 	global BaxY0
 	global BaxZ0
 	global BaxOrient
-
-	numBlocks = robot_interface.getNumBlocks()
+	global numBlocks
 
 	pose = rightMover.endpoint_pose()
 	position = pose['position']
@@ -59,6 +59,10 @@ def initToBaxter(rightMover):
 	BaxY0 = position[1]
 	BaxZ0 = position[2] - (numBlocks-1)*BLOCK_SIDE
 	BaxOrient = orientation
+
+	print BaxX0
+	print BaxY0
+	print BaxZ0
 
 def toBaxter(x,y,z):
 	global BaxX0

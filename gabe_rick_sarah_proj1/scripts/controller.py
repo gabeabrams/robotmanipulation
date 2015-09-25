@@ -135,11 +135,11 @@ if __name__ == '__main__':
 	ParamsBeingRead = 0
 	#readParams(); ParamsBeingRead = 1
 	if ParamsBeingRead == 0:
-		gridRows = 5
-		gridCols = 5
-		numBlocks = 4
-		blockLocaleRow = 3
-		blockLocaleCol = 3
+		gridRows = 3
+		gridCols = 3
+		numBlocks = 3
+		blockLocaleRow = 2
+		blockLocaleCol = 2
 		configuration = "stacked_ascending"
 		goalState = "stacked_descending"
 		isOneArmSolution = False
