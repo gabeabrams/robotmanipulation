@@ -374,7 +374,7 @@ def baxterMoveTo(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)	
 	else:
-		print "AHHHHHHHHH"	
+		print "Baxter MoveTo (" + str(x) + ", " + str(y) + ", " + str(z) + ") failed!"	
 
 def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 	global numBlocks
@@ -393,7 +393,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(x) + ", " + str(y) + ", " + str(z) + ") failed UPMOTION!"	
 
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, numBlocks+1)	
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
@@ -406,7 +406,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(x) + ", " + str(y) + ", " + str(z) + ") failed OVERMOTION!"		
 
 
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight+1)
@@ -416,7 +416,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)	
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(x) + ", " + str(y) + ", " + str(z) + ") failed DOWNMOTION!"	
 
 	return	
 
@@ -437,6 +437,7 @@ def baxterIKRequest(X, Y, Z, arm):
 	global rightMover
 	global leftMover
 
+	# Always keep same orientation
 	(xx, yy, zz, ww) = gridToCartesian.getBaxOrient()
 
 	ns = "ExternalTools/" + arm + "/PositionKinematicsNode/IKService"
@@ -693,7 +694,14 @@ def initBaxterObjects():
 	rightMover = Limb('right')
 	leftMover = Limb('left')
 
-	gridToCartesian.initToBaxter(rightMover)
+	# Initialize based on which is over the blocks
+	global numBlocks
+	global isOneArmSolution
+	if numBlocks%2 == 0 and not isOneArmSolution:
+		# We have an even number of blocks. Initialize with left
+		gridToCartesian.initToBaxter(leftMover)
+	else:
+		gridToCartesian.initToBaxter(rightMover)
 
 def readParams():
 	# Reads ROS Parameters from launch file
@@ -720,6 +728,12 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
+	
+	###### INIT VARIABLES ######
+	workspaceWidth = 1 #meters
+	workspaceHeight = .5 #meters
+	
+	
 
 	global gridRows
 	global gridCols
@@ -735,7 +749,7 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	gridToCartesian.initGridToCartesian((2,2),(1,.5),numBlocks,(blockLocaleRow, blockLocaleCol)) #meters
+	gridToCartesian.initGridToCartesian((gridRows,gridCols),(workspaceWidth,workspaceHeight),numBlocks,(blockLocaleRow, blockLocaleCol))
 	initBaxterObjects()
 
 	# Initialize network
@@ -750,9 +764,10 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 # INITIALIZE VIA MAIN
 if __name__ == "__main__":
 	try:
-		ParamsBeingRead = 0
-		#readParams(); ParamsBeingRead = 1
-		if ParamsBeingRead == 0:
+		ParamsBeingRead = True
+		if ParamsBeingRead:
+			readParams();
+		else:
 			gridRows = 3
 			gridCols = 3
 			numBlocks = 3

@@ -139,6 +139,8 @@ def readParams():
 if __name__ == '__main__':
 	ParamsBeingRead = True
 	if ParamsBeingRead:
+		readParams()
+	else:
 		gridRows = 3
 		gridCols = 3
 		numBlocks = 3
@@ -148,5 +150,3 @@ if __name__ == '__main__':
 		goalState = "stacked_descending"
 		isOneArmSolution = False
 		initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
-	else:
-		readParams()
