@@ -81,6 +81,10 @@ def createDormantAction(target, operation, text):
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
+def finishRight():
+	return [openGripper(),moveOut(2)]
+def finishLeft():
+	return [openGripper(),moveOut(1)]
 
 def padGeneral(rightActions,leftActions):
 	rPlus = [] 
@@ -149,10 +153,11 @@ def oneArm(startI,endI,numBlocks):
 		rightActions = []
 		rightActions += [(openGripper())]	
 		for blockID in scatterOrder:
-			rightActions += scatterBlock(blockID,3)
+			rightActions += scatterBlock(blockID,2)
 			
 	# If final state is scatter, we're done!
 	if endI == SCATTERED:
+		rightActions += finishRight()
 		return rightActions
 	
 	# Re-stack blocks
@@ -165,10 +170,11 @@ def oneArm(startI,endI,numBlocks):
 		rightActions += stackBlock(blockID,prevID)
 		prevID = blockID
 	
+	# Move out and let go
+	rightActions += finishRight()
 	return (rightActions)
 
 def twoArms(startI,endI,numBlocks):
-	
 	# If already done, return
 	if startI == endI:
 		return ([],[])
@@ -180,16 +186,21 @@ def twoArms(startI,endI,numBlocks):
 	if (startI == SCATTERED):
 		scatterOrder = []	
 	
+	# Move right arm out if required
+	rightActions = [openGripper()]
+	leftActions = [openGripper()]
+	if(numBlocks%2==0):
+		print "Clearing right arm from workspace"
+		rightActions += [moveAboveTable(2)]
+		leftActions += [moveAboveTable(1)]
+
 	# Prepare for synchronization
 	if numBlocks%2 == 0:
-		leftActions = []
-		rightActions = padScatterBlock()
+		rightActions += padScatterBlock()
 	else:	
-		rightActions = []
-		leftActions = padScatterBlock()
+		leftActions += padScatterBlock()
 
-	rightActions += [openGripper()]
-	leftActions += [openGripper()]
+	
 	
 	# Odd/Even Sorting
 	leftBottomID = -1
