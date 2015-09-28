@@ -30,7 +30,7 @@ def commandReceived(data):
 		goalState = data.data
 		requestWorldState()
 		kill = True
-		rospy.sleep(2)
+		rospy.sleep(1)
 		MakeAIControlRobot()	
 
 def requestWorldState():
@@ -82,7 +82,7 @@ def MakeAIControlRobot():
 
 		while (r < len(rightActions) - 1) and kill == False:
 			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
-			rospy.sleep(3)
+			rospy.sleep(1)
 			if dataBack == False:
 				print "Action failed! Recalculating 2 Arm Solution."
 				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
