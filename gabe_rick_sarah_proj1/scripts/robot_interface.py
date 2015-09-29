@@ -49,9 +49,9 @@ rightGripper = None;
 leftMover = None;
 rightMover = None;
 
-ClosedPercent = 10;
 BLOCK_SIDE = 1.75*.0254;
 numBlocks = 0;
+
 #######################WORLD STATE FUNCTIONS########################
 
 def getWorldState():
@@ -185,14 +185,14 @@ def getBlockInfo(blockID):
 				(found, row, col, depth, height) = getBlockInfo(newBlock) 
 		found = True
 
-	elif blockID == -4:
+	elif blockID == -11:
 		(row, col) = (1, gridCols+1)	
 		depth = 1
 		height = -1
 		found = True
 
-	elif blockID == -5:
-		(row, col) = (1, 0)
+	elif blockID == -11:
+		(row, col) = (1, 1)
 		depth = 1
 		height = -1
 		found = True		
@@ -236,15 +236,16 @@ def getRandomTableLocation(blockID):
 	homecol = home[1]
 	
 	while not succeeded:
-		if blockID == -3:
+		if blockID == -3: # Anywhere
 			taken = False
 			row = random.randint(1, worldState.grid.dimensions.row)
 			col = random.randint(1, worldState.grid.dimensions.col)
-		elif blockID == -1:	
+		elif blockID == -1:	# Left
 			taken = False
+			print "Random table location on right"
 			row = random.randint(1, worldState.grid.dimensions.row)
 			col = random.randint(1, homecol-1)
-		elif blockID == -2:	
+		elif blockID == -2:	# Right
 			taken = False
 			row = random.randint(1, worldState.grid.dimensions.row)
 			col = random.randint(homecol+1, worldState.grid.dimensions.col)
@@ -357,13 +358,13 @@ def baxterOpen(arm):
 		leftGripper.open(block = False, timeout = 5)		
 
 def baxterClose(arm):
-	global ClosedPercent
+	closedPercent = 5
 	global leftGripper
 	global rightGripper
 	if arm == 'right':
-		rightGripper.command_position(ClosedPercent, block = False, timeout = 5)
+		rightGripper.command_position(closedPercent, block = False, timeout = 5)
 	elif arm == 'left':
-		leftGripper.command_position(ClosedPercent, block = False, timeout = 5)
+		leftGripper.command_position(closedPercent, block = False, timeout = 5)
 
 def baxterMoveTo(arm, blockRow, blockCol, blockHeight):
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight)
@@ -374,7 +375,7 @@ def baxterMoveTo(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)	
 	else:
-		print "AHHHHHHHHH"	
+		print "Baxter MoveTo (" + str(BaxX) + ", " + str(BaxY) + ", " + str(BaxZ) + ") failed!"	
 
 def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 	global numBlocks
@@ -393,7 +394,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(BaxX) + ", " + str(BaxY) + ", " + str(BaxZ) + ") failed UPMOTION!"	
 
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, numBlocks+1)	
 	(BaxX, BaxY, BaxZ) = gridToCartesian.toBaxter(x,y,z)
@@ -406,7 +407,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(BaxX) + ", " + str(BaxY) + ", " + str(BaxZ) + ") failed OVERMOTION!"		
 
 
 	(x,y,z) = gridToCartesian.toCartesian(blockRow, blockCol, blockHeight+1)
@@ -416,7 +417,7 @@ def baxterMoveOver(arm, blockRow, blockCol, blockHeight):
 		joints = IKJoints 
 		baxterMover(arm, joints)	
 	else:
-		print "AHHHHHHHHH"		
+		print "Baxter MoveOver (" + str(x) + ", " + str(y) + ", " + str(z) + ") failed DOWNMOTION!"	
 
 	return	
 
@@ -430,13 +431,31 @@ def baxterMover(arm, Joints):
 	return		
 
 def baxterIKRequest(X, Y, Z, arm):
-	print "Requesting"
-	print X
-	print Y
-	print Z
+	global prevX
+	global prevY
+	global prevZ
+
+	#print "Action Location: (" + str(X) + ", " + str(Y) + ", " + str(Z) + ")"
+	if X < prevX:
+		print "Moving out."
+	if X > prevX:
+		print "Moving in."
+	if Y < prevY:
+		print "Moving right."
+	if Y > prevY:
+		print "Moving left."
+	if Z > prevZ:
+		print "Moving up."
+	if Z < prevZ:
+		print "Moving down."	
+	prevX = X
+	prevY = Y
+	prevZ = Z
+	
 	global rightMover
 	global leftMover
 
+	# Always keep same orientation
 	(xx, yy, zz, ww) = gridToCartesian.getBaxOrient()
 
 	ns = "ExternalTools/" + arm + "/PositionKinematicsNode/IKService"
@@ -693,9 +712,19 @@ def initBaxterObjects():
 	rightMover = Limb('right')
 	leftMover = Limb('left')
 
+	# Initialize based on which is over the blocks
+	global numBlocks
+	global isOneArmSolution
 	gridToCartesian.initToBaxter(rightMover)
+	#if numBlocks%2 == 0 and not isOneArmSolution:
+		# We have an even number of blocks. Initialize with left
+	#	print "Initializing with Left Arm"
+	#	gridToCartesian.initToBaxter(leftMover)
+	#else:
+	#	gridToCartesian.initToBaxter(rightMover)
 
 def readParams():
+	print "Reading Parameters:"
 	# Reads ROS Parameters from launch file
 	global gridRows
 	global gridCols
@@ -705,26 +734,47 @@ def readParams():
 	global configuration
 	global goalState
 	global isOneArmSolution
-
+	
 	gridRows = rospy.get_param("gridRows")
 	gridCols = rospy.get_param("gridCols")
+	print "- Grid dimensions: (" + str(gridRows) + ", " + str(gridCols) + ")"
 	numBlocks = rospy.get_param("numBlocks")
+	print "- Number of blocks: " + str(numBlocks)
 	blockLocaleRow = rospy.get_param("blockLocaleRow")
 	blockLocaleCol = rospy.get_param("blockLocaleCol")
+	print "- Home location: (" + str(blockLocaleRow) + ", " + str(blockLocaleCol) + ")"
 	configuration = rospy.get_param("configuration")
+	print "- Initial configuration: " + configuration
 	goalState = rospy.get_param("goalState")
-	isOneArmSolution = rospy.get_param("isOneArmSolution")	
+	print "- Final configuration: " + goalState
+	isOneArmSolution = rospy.get_param("isOneArmSolution")
+	if isOneArmSolution:
+		print "- We will be using one arm"
+	else:
+		print "- We will be using two arms"
 
 # Full setup
-def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, configuration, goalState, isOneArmSolution):
+def initRobotInterface():
 	"First function to call. Initializes robot_interface node."
 	# Create node
 	rospy.init_node('robot_interface')
+	print "\n\n\n\n\n\n\n\n\n\Robot Interface Node Initialized!\n-----------------------------------------"
+	readParams()
+	
+	###### INIT VARIABLES ######
+	workspaceWidth = .8 #meters
+	workspaceHeight = .5 #meters
+	
+	global prevX
+	global prevY
+	global prevZ
+
+	prevX = 0
+	prevY = 0
+	prevZ = 0
 
 	global gridRows
 	global gridCols
-	gridRows = Rows
-	gridCols = Cols
 
 	global lastBaxterRightLoc
 	lastBaxterRightLoc = (blockLocaleRow, blockLocaleCol)
@@ -735,12 +785,15 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 	# Initialize world state
 	initWorldState(gridRows,gridCols) 
 	initBlocksInStack(configuration,numBlocks,blockLocaleRow,blockLocaleCol)
-	gridToCartesian.initGridToCartesian((2,2),(1,.5),numBlocks,(blockLocaleRow, blockLocaleCol)) #meters
+	gridToCartesian.initGridToCartesian((gridRows,gridCols),(workspaceWidth,workspaceHeight),numBlocks,(blockLocaleRow, blockLocaleCol))
 	initBaxterObjects()
 
 	# Initialize network
+	print "Waiting for network..."
 	(moveRobotServer,getStateServer,worldStatePublisher,publishRate) = initNetwork()
 	
+	print "-----------------------------------------"
+	print "Brilliant. I'll get started when I get commands!"
 	# Continually network
 	while not rospy.is_shutdown():
 		rospy.loginfo(worldState)
@@ -749,21 +802,7 @@ def initRobotInterface(Rows, Cols, numBlocks, blockLocaleRow, blockLocaleCol, co
 
 # INITIALIZE VIA MAIN
 if __name__ == "__main__":
-	try:
-		ParamsBeingRead = 0
-		#readParams(); ParamsBeingRead = 1
-		if ParamsBeingRead == 0:
-			gridRows = 3
-			gridCols = 3
-			numBlocks = 3
-			blockLocaleRow = 2
-			blockLocaleCol = 2
-			configuration = "stacked_ascending"
-			goalState = "stacked_descending"
-			isOneArmSolution = False
-		initRobotInterface(gridRows,gridCols,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
-	except rospy.ROSInterruptException:
-		pass
+	initRobotInterface()
 
 ######################TESTING FUNCTIONS########################
 def runTests():

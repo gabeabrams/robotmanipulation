@@ -1,0 +1,6 @@
+<launch>
+
+	<param name = "numBlocks" value = "3" />
+	<param name = "goalState" value = "stacked_ascending" />
+	<param name = "configuration" value = "stacked_descending" />
+</launch>

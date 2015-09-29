@@ -7,6 +7,8 @@ TABLE_RIGHT_TARGET = -2
 HOME_TARGET = 0
 GRIPPER_TARGET = -4
 NO_TARGET = -5
+TABLE_LEFT_OUT = -7
+TABLE_RIGHT_OUT = -11
 
 OPEN_OPERATION = 1
 CLOSE_OPERATION = 2
@@ -81,6 +83,10 @@ def createDormantAction(target, operation, text):
 
 # COMPOSITE ACTIONS
 # area: 1=left, 2=right, 0=either
+def finishRight():
+	return [openGripper(),moveOut(TABLE_RIGHT_OUT)]
+def finishLeft():
+	return [openGripper(),moveOut(TABLE_LEFT_OUT)]
 
 def padGeneral(rightActions,leftActions):
 	rPlus = [] 
@@ -97,7 +103,7 @@ def padScatterBlock():
 	return [still(),still(),still(),still()]
 	
 def scatterBlock(blockID,area):
-	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(area),openGripper(), still(),still()]
+	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveAboveTable(abs(area)),openGripper(), still(),still()]
 	
 def scatterOnto(blockID,blockIDBelow):
 	return [still(),moveOverBlock(blockID),moveToBlock(blockID),closeGripper(),     moveOverBlock(blockIDBelow),openGripper(),still(),still()]
@@ -149,10 +155,11 @@ def oneArm(startI,endI,numBlocks):
 		rightActions = []
 		rightActions += [(openGripper())]	
 		for blockID in scatterOrder:
-			rightActions += scatterBlock(blockID,3)
+			rightActions += scatterBlock(blockID,2)
 			
 	# If final state is scatter, we're done!
 	if endI == SCATTERED:
+		rightActions += finishRight()
 		return rightActions
 	
 	# Re-stack blocks
@@ -165,10 +172,11 @@ def oneArm(startI,endI,numBlocks):
 		rightActions += stackBlock(blockID,prevID)
 		prevID = blockID
 	
+	# Move out and let go
+	rightActions += finishRight()
 	return (rightActions)
 
-def twoArms(startI,endI,numBlocks):
-	
+def twoArms(startI,endI,numBlocks, worldState):
 	# If already done, return
 	if startI == endI:
 		return ([],[])
@@ -177,23 +185,47 @@ def twoArms(startI,endI,numBlocks):
 	scatterOrder = range(1,numBlocks+1)
 	if(startI == STACKED_ASCENDING):
 		scatterOrder.reverse()
-	if (startI == SCATTERED):
+	if (startI == SCATTERED and endI != SORTED_ODD_EVEN):
 		scatterOrder = []	
-	
-	# Prepare for synchronization
-	if numBlocks%2 == 0:
-		leftActions = []
-		rightActions = padScatterBlock()
-	else:	
-		rightActions = []
-		leftActions = padScatterBlock()
+	if (startI == SORTED_ODD_EVEN):
+		# If sorted, right gets to go first
+		oddBlocks = worldState.grid.stacks[0].blocks
+		evenBlocks = worldState.grid.stacks[1].blocks
+		if oddBlocks[0]%2 == 0:
+			oddBlocks = evenBlocks
+			evenBlocks = worldState.grid.stacks[0].blocks
+		scatterOrder = []
+		while True:
+			if len(oddBlocks) > 1:
+				scatterOrder.append(oddBlocks[-1])
+				oddBlocks = oddBlocks[:len(oddBlocks)-1]
+			else:
+				break
+			if len(evenBlocks) > 1:
+				scatterOrder.append(evenBlocks[-1])
+				evenBlocks = evenBlocks[:len(oddBlocks)-1]
 
-	rightActions += [openGripper()]
-	leftActions += [openGripper()]
+	
+	# Move right arm out if required
+	rightActions = [openGripper()]
+	leftActions = [openGripper()]
+
+	# Prepare for synchronization
+	if numBlocks%2 == 0 and startI == STACKED_ASCENDING:
+		rightActions += [moveOut(TABLE_RIGHT_OUT)]		
+		rightActions += padScatterBlock()
+		leftActions += [still()]
+	else:	
+		leftActions += padScatterBlock()	
 	
 	# Odd/Even Sorting
 	leftBottomID = -1
 	rightBottomID = -1
+
+	if startI == SCATTERED:
+		leftBottomID = 2
+		rightBottomID = 1
+		scatterOrder = scatterOrder[2:]
 	
 	for blockID in scatterOrder:
 		if len(rightActions) < len(leftActions):
@@ -229,14 +261,17 @@ def twoArms(startI,endI,numBlocks):
 	# If final state is scatter, we're done!
 	if endI > 2:
 		return (rightActions,leftActions)
-		
-	# Stagger
-	leftActions += padStackBlock() # right goes first
 	
 	# Re-stack blocks
 	stackOrder = range(1,numBlocks+1)
 	if(endI == STACKED_DESCENDING):
 		stackOrder.reverse()
+		if numBlocks%2 == 0:
+			rightActions += padStackBlock()
+		else:
+			leftActions += padStackBlock()
+	else:
+		leftActions += padStackBlock()			
 	
 	prevID = None
 	for blockID in stackOrder:
@@ -248,10 +283,10 @@ def twoArms(startI,endI,numBlocks):
 	
 	# Synchronize arms
 	if len(rightActions) < len(leftActions):
-		rightActions += [moveOut(-4)]
+		rightActions += [moveOut(TABLE_RIGHT_OUT)]
 		rightActions += padStackBlock()
 	else:
-		leftActions += [moveOut(-5)]
+		leftActions += [moveOut(TABLE_LEFT_OUT)]
 		leftActions += padStackBlock()
 			
 	return (rightActions,leftActions)
@@ -287,16 +322,16 @@ def fallback(worldState, numArmsToUse):
 		blocks = tuple(blockList)
 		for blockID in blocks:
 			if (blockID%2) == 0:
-				rightActions += scatterBlock(blockID,2)
+				rightActions += scatterBlock(blockID,TABLE_LEFT_TARGET)
 			else:
-				rightActions += scatterBlock(blockID,1)	
+				rightActions += scatterBlock(blockID,TABLE_RIGHT_TARGET)	
 
 	for stack in shortStacks:
 		blockID = stack.blocks[0]
 		if blockID%2 == 0:
-			rightActions += scatterBlock(blockID, 1)
+			rightActions += scatterBlock(blockID, TABLE_LEFT_TARGET)
 		else:
-			rightActions += scatterBlock(blockID, 2)				
+			rightActions += scatterBlock(blockID, TABLE_RIGHT_TARGET)				
 	
 	return (rightActions)
 	
@@ -322,17 +357,26 @@ def detectConfig(worldState):
 	global homeCol
 	clogging = False
 
-	for stack in worldState.grid.stacks:
-		if maxStackHeight < len(stack.blocks):
-			maxStackHeight = len(stack.blocks)
-		if stack.row == homeRow and stack.col == homeCol:
-			clogging = True
-	
 	# Get number of blocks
 	numBlocks = 0
 	for stack in worldState.grid.stacks:
 		for blockID in stack.blocks:
 			numBlocks += 1
+
+	if len(worldState.grid.stacks) == 2:
+		thisIsEven = (worldState.grid.stacks[0].blocks[0]%2==0)
+		AllSame = True
+		for block in worldState.grid.stacks[0].blocks:
+			if (block%2 == 0) != thisIsEven:
+				AllSame = False
+		if AllSame == True:
+			return (SORTED_ODD_EVEN, numBlocks)	
+
+	for stack in worldState.grid.stacks:
+		if maxStackHeight < len(stack.blocks):
+			maxStackHeight = len(stack.blocks)
+		if stack.row == homeRow and stack.col == homeCol:
+			clogging = True
 	
 	# Get number of stacks
 	numStacks = len(worldState.grid.stacks)
@@ -384,7 +428,7 @@ def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 		(rPlus) = fallback(worldState, numArmsToUse)
 		rightActions += rPlus
 		leftActions += [openGripper()]
-		leftActions += [moveOut(-5)]
+		leftActions += [moveOut(TABLE_LEFT_OUT)]
 		currentState = SCATTERED
 	
 	# PAD TO START FRESH
@@ -397,7 +441,7 @@ def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 		rightActions += rPlus
 	
 	if numArmsToUse == 2:
-		(rPlus,lPlus) = twoArms(currentState,goalState,numBlocks)
+		(rPlus,lPlus) = twoArms(currentState,goalState,numBlocks, worldState)
 		leftActions += lPlus
 		rightActions += rPlus
 	

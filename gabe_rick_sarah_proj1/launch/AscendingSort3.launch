@@ -6,6 +6,6 @@
 	<param name = "blockLocaleRow" value = "2" />
 	<param name = "blockLocaleCol" value = "4" />
 	<param name = "configuration" value = "stacked_ascending" />
-	<param name = "goalState" value = "stacked_descending" />
+	<param name = "goalState" value = "sorted_odd_even" />
 	<param name = "isOneArmSolution" value = "False" />
 </launch>

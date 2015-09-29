@@ -53,26 +53,6 @@ def initNetwork():
 	# Subscribe to terminal commands
 	rospy.Subscriber("command", String, commandReceived)
 
-def readParams():
-	# Reads ROS Parameters from launch file
-	global gridRows
-	global gridCols
-	global numBlocks
-	global blockLocaleRow
-	global blockLocaleCol
-	global configuration
-	global goalState
-	global isOneArmSolution
-	
-	gridRows = rospy.get_param("gridRows")
-	gridCols = rospy.get_param("gridCols")
-	numBlocks = rospy.get_param("numBlocks")
-	blockLocaleRow = rospy.get_param("blockLocaleRow")
-	blockLocaleCol = rospy.get_param("blockLocaleCol")
-	configuration = rospy.get_param("configuration")
-	goalState = rospy.get_param("goalState")
-	isOneArmSolution = rospy.get_param("isOneArmSolution")
-
 def MakeAIControlRobot():
 	global worldState
 	global goalState
@@ -86,13 +66,17 @@ def MakeAIControlRobot():
 	rightActions = []
 	leftActions = []
 
+	# Setup times
+	secondsBetweenActions = 1.5
+
 	if isOneArmSolution:
 		((rightActions,r),(leftActions, l)) = ai.heyAIWhatsNext(worldState, goalState, 1)
+		
 		while (r < len(rightActions) - 1) and kill == False:
 			(r, dataBack) = ai.heyAIDoNext(((rightActions,r), (leftActions, l)), 1)
-			rospy.sleep(1)
+			rospy.sleep(secondsBetweenActions)
 			if dataBack == False:
-				print "oh no"
+				print "Action failed! Recalculating 1 Arm Solution."
 				((rightActions,r)) = ai.heyAIWhatsNext(worldState, goalState, 1)
 		if kill == True:
 			kill = False	
@@ -101,9 +85,9 @@ def MakeAIControlRobot():
 
 		while (r < len(rightActions) - 1) and kill == False:
 			(((rightActions,r),(leftActions,l)), dataBack) = ai.heyAIDoNext(((rightActions,r),(leftActions,l)), 2)
-			rospy.sleep(3)
+			rospy.sleep(secondsBetweenActions)
 			if dataBack == False:
-				print "oh no"
+				print "Action failed! Recalculating 2 Arm Solution."
 				((rightActions,r),(leftActions,l)) = ai.heyAIWhatsNext(worldState, goalState, 2)
 		if kill == True:
 			kill == False
@@ -112,35 +96,62 @@ def MakeAIControlRobot():
 	print "Starting from:"
 	print worldState	
 	print ""	
-	
-def initController(gridRows, gridCols, numBlocks, localeRow, localeCol, configuration, goalState, isOneArmSpolution):
-	# Create controller node
-	rospy.init_node("controller")
+	# gridRows, gridCols, numBlocks, localeRow, localeCol, configuration, goalState, isOneArmSpolution
 
+	
+def readParams():
+	print "Reading Parameters:"
+	# Reads ROS Parameters from launch file
+	global gridRows
+	global gridCols
+	global numBlocks
 	global blockLocaleRow
 	global blockLocaleCol
-	blockLocaleRow = localeRow
-	blockLocaleCol = localeCol
+	global configuration
+	global goalState
+	global isOneArmSolution
+	
+	gridRows = rospy.get_param("gridRows")
+	gridCols = rospy.get_param("gridCols")
+	print "- Grid dimensions: (" + str(gridRows) + ", " + str(gridCols) + ")"
+	numBlocks = rospy.get_param("numBlocks")
+	print "- Number of blocks: " + str(numBlocks)
+	blockLocaleRow = rospy.get_param("blockLocaleRow")
+	blockLocaleCol = rospy.get_param("blockLocaleCol")
+	print "- Home location: (" + str(blockLocaleRow) + ", " + str(blockLocaleCol) + ")"
+	configuration = rospy.get_param("configuration")
+	print "- Initial configuration: " + configuration
+	goalState = rospy.get_param("goalState")
+	print "- Final configuration: " + goalState
+	isOneArmSolution = rospy.get_param("isOneArmSolution")
+	if isOneArmSolution:
+		print "- We will be using one arm"
+	else:
+		print "- We will be using two arms"
+
+	
+
+def initController():
+	# Create controller node
+	rospy.init_node("controller")
+	print "\n\n\n\n\n\n\n\n\n\nController Node Initialized!\n-----------------------------------------"
+	readParams()
+ 	print "-----------------------------------------"   
+
+    # Get values from robot_interface globals
+	global blockLocaleRow
+	global blockLocaleCol
 
 	# Create the network
+	print "Waiting for network..."
 	initNetwork()
 	requestWorldState()
 	ai.sendHomeLoc(blockLocaleRow, blockLocaleCol)
-
+	print "-----------------------------------------"
+	print "Brilliant. Let's get started!"
 	MakeAIControlRobot()
 
 	rospy.spin()
 
 if __name__ == '__main__':
-	ParamsBeingRead = 0
-	#readParams(); ParamsBeingRead = 1
-	if ParamsBeingRead == 0:
-		gridRows = 3
-		gridCols = 3
-		numBlocks = 3
-		blockLocaleRow = 2
-		blockLocaleCol = 2
-		configuration = "stacked_ascending"
-		goalState = "stacked_descending"
-		isOneArmSolution = False
-	initController(gridRows,gridRows,numBlocks,blockLocaleRow,blockLocaleCol,configuration,goalState,isOneArmSolution)
+	initController()
