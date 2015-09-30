@@ -300,13 +300,17 @@ def fallback(worldState,numArms):
 
 def fallbackTwoArms(worldState):
 	rightActions = []
+	rightActions += [openGripper()]
 	leftActions = []
+	leftActions += [openGripper()]
+	scatterOrder = []
 	
 	for stack in worldState.grid.stacks:
 		blocks = stack.blocks
-		blocks.reverse()
-		for blockID in blocks:
-			if blockID%2 != 0:
+		scatterOrder = list(blocks)
+		scatterOrder.reverse()
+		for blockID in scatterOrder:
+			if blockID%2 == 0:
 				leftActions += scatterBlock(blockID,TABLE_LEFT_TARGET)
 				rightActions += padScatterBlock()
 				rightActions += padScatterBlock()
@@ -317,9 +321,17 @@ def fallbackTwoArms(worldState):
 		return (rightActions,leftActions)
 
 def fallbackOneArm(worldState):
-	rightActions = fallbackOld(worldState,1)
+	rightActions = []
+	rightActions += [openGripper()]
+	scatterOrder = []
+	for stack in worldState.grid.stacks:
+			blocks = stack.blocks
+			scatterOrder = list(blocks)
+			scatterOrder.reverse()
+			for blockID in scatterOrder:
+				rightActions += scatterBlock(blockID,TABLE_RIGHT_TARGET)
+
 	leftActions = []
-	
 	(rPlus, lPlus) = padGeneral(rightActions,leftActions)
 	rightActions += rPlus
 	leftActions += lPlus

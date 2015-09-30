@@ -27,6 +27,7 @@ def initGridToCartesian(tableRowCols, tableDimensions, numB, home):
 	global gridWidth
 	global gridHeight
 	global gridDepth
+	
 	gridWidth = float(width)/float(cols)
 	gridHeight = float(height)/float(rows)
 	gridDepth = BLOCK_SIDE
@@ -35,6 +36,9 @@ def toCartesian(row,col,height):
 	global gridWidth
 	global gridHeight
 	global gridDepth
+	
+	print gridWidth
+	print gridWidth
 	
 	rowDiff = row-homeRow
 	colDiff = col-homeCol
@@ -60,10 +64,6 @@ def initToBaxter(mover):
 	BaxY0 = position[1]
 	BaxZ0 = position[2] - (numBlocks-1)*BLOCK_SIDE
 	BaxOrient = orientation
-
-	print BaxX0
-	print BaxY0
-	print BaxZ0
 
 def toBaxter(x,y,z):
 	global BaxX0

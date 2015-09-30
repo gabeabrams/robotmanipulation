@@ -1,12 +1,12 @@
 <launch>
 
 	<param name = "gridRows" value = "3" />
-	<param name = "gridCols" value = "7" />
-	<param name = "numBlocks" value = "3" />
+	<param name = "gridCols" value = "5" />
+	<param name = "numBlocks" value = "10" />
 	<param name = "blockLocaleRow" value = "2" />
-	<param name = "blockLocaleCol" value = "4" />
+	<param name = "blockLocaleCol" value = "3" />
 	<param name = "configuration" value = "stacked_ascending" />
-	<param name = "goalState" value = "stacked_descending" />
+	<param name = "goalState" value = "sorted_odd_even" />
 	<param name = "isOneArmSolution" value = "False" />
 
 </launch>

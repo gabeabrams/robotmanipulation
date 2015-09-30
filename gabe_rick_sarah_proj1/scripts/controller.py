@@ -61,7 +61,8 @@ def MakeAIControlRobot():
 	global kill
 	kill = False
 
-	print ""
+	print worldState	
+	print ""	
 
 	rightActions = []
 	leftActions = []
@@ -93,9 +94,8 @@ def MakeAIControlRobot():
 			kill == False
 	rospy.sleep(1)	
 	
-	print "Starting from:"
-	print worldState	
-	print ""	
+	print "I did it!"
+	print ""
 	# gridRows, gridCols, numBlocks, localeRow, localeCol, configuration, goalState, isOneArmSpolution
 
 	

@@ -191,8 +191,8 @@ def getBlockInfo(blockID):
 		height = -1
 		found = True
 
-	elif blockID == -11:
-		(row, col) = (1, 1)
+	elif blockID == -7:
+		(row, col) = (1, 0)
 		depth = 1
 		height = -1
 		found = True		
@@ -762,7 +762,7 @@ def initRobotInterface():
 	readParams()
 	
 	###### INIT VARIABLES ######
-	workspaceWidth = .8 #meters
+	workspaceWidth = 1.2 #meters
 	workspaceHeight = .5 #meters
 	
 	global prevX
