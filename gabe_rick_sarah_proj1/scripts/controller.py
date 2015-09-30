@@ -30,7 +30,7 @@ def commandReceived(data):
 		goalState = data.data
 		requestWorldState()
 		kill = True
-		rospy.sleep(2)
+		rospy.sleep(10)
 		MakeAIControlRobot()	
 
 def requestWorldState():

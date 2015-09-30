@@ -8,8 +8,4 @@
 	<param name = "configuration" value = "stacked_ascending" />
 	<param name = "goalState" value = "stacked_descending" />
 	<param name = "isOneArmSolution" value = "False" />
-
-	<node name = "controller" pkg = "gabe_ricky_sarah_proj1" type = "controller.py" />
-
-	<node name = "robot_interface" pkg = "gabe_ricky_sarah_proj1" type = "robot_interface.py" />
 </launch>

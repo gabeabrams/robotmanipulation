@@ -306,14 +306,14 @@ def fallbackTwoArms(worldState):
 		blocks = stack.blocks
 		blocks.reverse()
 		for blockID in blocks:
-			if blockID in blocks:
+			if blockID%2 != 0:
 				leftActions += scatterBlock(blockID,TABLE_LEFT_TARGET)
 				rightActions += padScatterBlock()
 				rightActions += padScatterBlock()
 			else:
 				rightActions += scatterBlock(blockID,TABLE_RIGHT_TARGET)
-				leftActions += padScatterBlocks()
-				leftActions += padScatterBlocks()
+				leftActions += padScatterBlock()
+				leftActions += padScatterBlock()
 		return (rightActions,leftActions)
 
 def fallbackOneArm(worldState):
