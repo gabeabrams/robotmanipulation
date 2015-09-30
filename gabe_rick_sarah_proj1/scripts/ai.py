@@ -292,9 +292,42 @@ def twoArms(startI,endI,numBlocks, worldState):
 	return (rightActions,leftActions)
 
 # FALLBACK
+def fallback(worldState,numArms):
+	if numArms == 1:
+		return fallbackOneArm(worldState)
+	else:
+		return fallbackTwoArms(worldState)
+
+def fallbackTwoArms(worldState):
+	rightActions = []
+	leftActions = []
+	
+	for stack in worldState.grid.stacks:
+		blocks = stack.blocks
+		blocks.reverse()
+		for blockID in blocks:
+			if blockID in blocks:
+				leftActions += scatterBlock(blockID,TABLE_LEFT_TARGET)
+				rightActions += padScatterBlock()
+				rightActions += padScatterBlock()
+			else:
+				rightActions += scatterBlock(blockID,TABLE_RIGHT_TARGET)
+				leftActions += padScatterBlocks()
+				leftActions += padScatterBlocks()
+		return (rightActions,leftActions)
+
+def fallbackOneArm(worldState):
+	rightActions = fallbackOld(worldState,1)
+	leftActions = []
+	
+	(rPlus, lPlus) = padGeneral(rightActions,leftActions)
+	rightActions += rPlus
+	leftActions += lPlus
+	
+	return (rightActions,leftActions)
 
 # Uses one arm to finish operation
-def fallback(worldState, numArmsToUse):
+def fallbackOld(worldState, numArmsToUse):
 	print "Fallback activated."
 	
 	# Open first
@@ -418,6 +451,8 @@ def runActions(dormantActionRight, dormantActionLeft):
 # Usage: pass in world state, goal string from params, number of arms
 # ex: actionPackage = heyAIWhatsNext(worldState,"scattered",2)
 def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
+	useNewFallback = True # NEW FALLBACK. SET TO FALSE FOR OLD FALLBACK
+
 	(currentState, numBlocks) = detectConfig(worldState)
 	goalState = translateStateInfo(goalStateString)
 	
@@ -425,11 +460,16 @@ def heyAIWhatsNext(worldState, goalStateString, numArmsToUse):
 	
 	# RECOVER WITH FALLBACK IF NEEDED
 	if currentState == MESSED_UP:
-		(rPlus) = fallback(worldState, numArmsToUse)
-		rightActions += rPlus
-		leftActions += [openGripper()]
-		leftActions += [moveOut(TABLE_LEFT_OUT)]
-		currentState = SCATTERED
+		if useNewFallback:
+			(r,l) = fallback(worldState,numArmsToUse)
+			rightActions += r
+			leftActions += l
+		else:
+			(rPlus) = fallbackOld(worldState, numArmsToUse)
+			rightActions += rPlus
+			leftActions += [openGripper()]
+			leftActions += [moveOut(TABLE_LEFT_OUT)]
+			currentState = SCATTERED
 	
 	# PAD TO START FRESH
 	(rPlus, lPlus) = padGeneral(rightActions,leftActions)
